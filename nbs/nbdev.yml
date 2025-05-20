@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "randseq"
+  site-url: "https://dbikard.github.io/randseq"
+  description: "inferring restricted motifs using the  RandSeq method"
+  repo-branch: main
+  repo-url: "https://github.com/dbikard/randseq"

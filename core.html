@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.7.31">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Fill in a module description here">
+
+<title>core – randseq</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-e1a5c8363afafaef2c763b6775fbf3ca.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-fe8f458f31a467b51aeabd2275c1e88a.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="core – randseq">
+<meta property="og:description" content="Fill in a module description here">
+<meta property="og:image" content="https://dbikard.github.io/randseq/00_core_files/figure-html/cell-28-output-1.png">
+<meta property="og:site_name" content="randseq">
+<meta property="og:image:height" content="744">
+<meta property="og:image:width" content="830">
+<meta name="twitter:title" content="core – randseq">
+<meta name="twitter:description" content="Fill in a module description here">
+<meta name="twitter:image" content="https://dbikard.github.io/randseq/00_core_files/figure-html/cell-28-output-1.png">
+<meta name="twitter:image-height" content="744">
+<meta name="twitter:image-width" content="830">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">randseq</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./core.html">core</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">randseq</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./utils.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Utils</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#computing-the-log2fc-of-the-sequences-from-counts-data" id="toc-computing-the-log2fc-of-the-sequences-from-counts-data" class="nav-link active" data-scroll-target="#computing-the-log2fc-of-the-sequences-from-counts-data">1. Computing the log2fc of the sequences from counts data</a></li>
+  <li><a href="#obtaining-the-sequence-context-of-the-variable-sequence-to-identify-sites-at-the-boundaries-of-the-variable-sequence" id="toc-obtaining-the-sequence-context-of-the-variable-sequence-to-identify-sites-at-the-boundaries-of-the-variable-sequence" class="nav-link" data-scroll-target="#obtaining-the-sequence-context-of-the-variable-sequence-to-identify-sites-at-the-boundaries-of-the-variable-sequence">2. Obtaining the sequence context of the variable sequence to identify sites at the boundaries of the variable sequence</a></li>
+  <li><a href="#get_lib_seq_context" id="toc-get_lib_seq_context" class="nav-link" data-scroll-target="#get_lib_seq_context">get_lib_seq_context</a></li>
+  <li><a href="#listing-all-the-sequence-motifs-found-in-our-library-that-follow-a-specific-pattern" id="toc-listing-all-the-sequence-motifs-found-in-our-library-that-follow-a-specific-pattern" class="nav-link" data-scroll-target="#listing-all-the-sequence-motifs-found-in-our-library-that-follow-a-specific-pattern">3. Listing all the sequence motifs found in our library that follow a specific pattern</a></li>
+  <li><a href="#get_sites_in_seq" id="toc-get_sites_in_seq" class="nav-link" data-scroll-target="#get_sites_in_seq">get_sites_in_seq</a></li>
+  <li><a href="#score" id="toc-score" class="nav-link" data-scroll-target="#score">score</a></li>
+  <li><a href="#identify_depleted_motifs_scanning_ends" id="toc-identify_depleted_motifs_scanning_ends" class="nav-link" data-scroll-target="#identify_depleted_motifs_scanning_ends">identify_depleted_motifs_scanning_ends</a></li>
+  <li><a href="#filter_to_core_motifs" id="toc-filter_to_core_motifs" class="nav-link" data-scroll-target="#filter_to_core_motifs">filter_to_core_motifs</a></li>
+  <li><a href="#get_fold_change_values_per_site" id="toc-get_fold_change_values_per_site" class="nav-link" data-scroll-target="#get_fold_change_values_per_site">get_fold_change_values_per_site</a></li>
+  <li><a href="#filter_sequences_without_core_motifs" id="toc-filter_sequences_without_core_motifs" class="nav-link" data-scroll-target="#filter_sequences_without_core_motifs">filter_sequences_without_core_motifs</a></li>
+  <li><a href="#get_sites_scores" id="toc-get_sites_scores" class="nav-link" data-scroll-target="#get_sites_scores">get_sites_scores</a></li>
+  <li><a href="#filter_to_core_flexible_motifs" id="toc-filter_to_core_flexible_motifs" class="nav-link" data-scroll-target="#filter_to_core_flexible_motifs">filter_to_core_flexible_motifs</a></li>
+  <li><a href="#plot_flexible_motif_analysis" id="toc-plot_flexible_motif_analysis" class="nav-link" data-scroll-target="#plot_flexible_motif_analysis">plot_flexible_motif_analysis</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="core.html.md"><i class="bi bi-file-code"></i>CommonMark</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">core</h1>
+</div>
+
+<div>
+  <div class="description">
+    Fill in a module description here
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="computing-the-log2fc-of-the-sequences-from-counts-data" class="level3">
+<h3 class="anchored" data-anchor-id="computing-the-log2fc-of-the-sequences-from-counts-data">1. Computing the log2fc of the sequences from counts data</h3>
+<div id="cell-3" class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>counts_file<span class="op">=</span><span class="st">"countsTable.csv"</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>file_path<span class="op">=</span>os.path.join(data_path,counts_file)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>counts<span class="op">=</span>pd.read_csv(file_path, index_col<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>counts <span class="op">=</span> counts[[col <span class="cf">for</span> col <span class="kw">in</span> counts.columns <span class="cf">if</span> (<span class="st">"_T0"</span> <span class="kw">in</span> col) <span class="kw">or</span> (<span class="st">"MFDpir"</span> <span class="kw">in</span> col)]]</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>log2fc_df <span class="op">=</span> calculate_log2fc(counts, reference_column<span class="op">=</span><span class="st">'MFDpir'</span>, count_threshold<span class="op">=</span><span class="dv">20</span>, pseudocount<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>log2fc_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">K12_T0</th>
+<th data-quarto-table-cell-role="th">HS_T0</th>
+<th data-quarto-table-cell-role="th">E1114_T0</th>
+<th data-quarto-table-cell-role="th">E1167_T0</th>
+<th data-quarto-table-cell-role="th">H120_T0</th>
+<th data-quarto-table-cell-role="th">TA054_T0</th>
+<th data-quarto-table-cell-role="th">TA447_T0</th>
+<th data-quarto-table-cell-role="th">E101_T0</th>
+<th data-quarto-table-cell-role="th">41-1Ti9_T0</th>
+<th data-quarto-table-cell-role="th">TA280_T0</th>
+<th data-quarto-table-cell-role="th">M114_T0</th>
+<th data-quarto-table-cell-role="th">TA249_T0</th>
+<th data-quarto-table-cell-role="th">ROAR8_T0</th>
+<th data-quarto-table-cell-role="th">JJ1886_T0</th>
+<th data-quarto-table-cell-role="th">CFT073_T0</th>
+<th data-quarto-table-cell-role="th">APECO1_T0</th>
+<th data-quarto-table-cell-role="th">UTI89_T0</th>
+<th data-quarto-table-cell-role="th">S88_T0</th>
+<th data-quarto-table-cell-role="th">MG1655_T0</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">CGGAGGTACTGGGTACATTT</td>
+<td>0.043818</td>
+<td>0.049551</td>
+<td>0.187868</td>
+<td>-0.302314</td>
+<td>0.238304</td>
+<td>0.051836</td>
+<td>0.186450</td>
+<td>0.093344</td>
+<td>0.029484</td>
+<td>0.106924</td>
+<td>-0.329062</td>
+<td>-0.102645</td>
+<td>0.144280</td>
+<td>0.084854</td>
+<td>0.212674</td>
+<td>0.229591</td>
+<td>-0.457070</td>
+<td>0.213624</td>
+<td>0.090458</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">TGGCGATAATGCCGGCTATC</td>
+<td>0.045463</td>
+<td>0.137127</td>
+<td>0.437387</td>
+<td>0.113014</td>
+<td>0.137767</td>
+<td>0.060845</td>
+<td>0.063668</td>
+<td>-0.014449</td>
+<td>-0.008977</td>
+<td>-0.025606</td>
+<td>0.003605</td>
+<td>0.084441</td>
+<td>-0.167417</td>
+<td>0.018354</td>
+<td>0.041919</td>
+<td>0.016410</td>
+<td>-0.207488</td>
+<td>0.092292</td>
+<td>0.101627</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">TTCCAGTTCACTGGTCTTCG</td>
+<td>-0.049694</td>
+<td>0.049903</td>
+<td>-0.105148</td>
+<td>-0.061620</td>
+<td>-0.081886</td>
+<td>-0.072083</td>
+<td>0.402207</td>
+<td>0.087885</td>
+<td>0.207649</td>
+<td>0.127306</td>
+<td>0.204781</td>
+<td>-0.106153</td>
+<td>-0.012804</td>
+<td>0.285761</td>
+<td>-0.167107</td>
+<td>0.269887</td>
+<td>0.182096</td>
+<td>0.458076</td>
+<td>0.128330</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">AATTTCAGTGCCGTTCAGAT</td>
+<td>-0.251957</td>
+<td>-0.422224</td>
+<td>-0.224591</td>
+<td>-0.058728</td>
+<td>-0.204575</td>
+<td>-0.192908</td>
+<td>-0.220676</td>
+<td>-0.143054</td>
+<td>-0.277042</td>
+<td>-0.205084</td>
+<td>0.058866</td>
+<td>-0.064442</td>
+<td>-0.029019</td>
+<td>-0.042375</td>
+<td>-0.095307</td>
+<td>-0.254714</td>
+<td>0.460256</td>
+<td>-0.183890</td>
+<td>-0.180938</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">CTGCGGTAATAATTCCCGCC</td>
+<td>-0.178427</td>
+<td>-0.154025</td>
+<td>0.581087</td>
+<td>0.401967</td>
+<td>0.047002</td>
+<td>-0.309751</td>
+<td>-0.200689</td>
+<td>-0.292042</td>
+<td>-0.473919</td>
+<td>-0.298991</td>
+<td>-0.221896</td>
+<td>-0.060500</td>
+<td>0.085888</td>
+<td>-0.279165</td>
+<td>-0.206676</td>
+<td>-0.097563</td>
+<td>-0.347949</td>
+<td>-0.188758</td>
+<td>-0.186226</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">GCTTGATGTAGCCTTCGAAC</td>
+<td>-0.100518</td>
+<td>-0.079966</td>
+<td>0.027302</td>
+<td>-0.268222</td>
+<td>-0.337706</td>
+<td>-0.047079</td>
+<td>-0.072379</td>
+<td>-0.246364</td>
+<td>-0.250380</td>
+<td>-0.142468</td>
+<td>-0.091826</td>
+<td>-0.004635</td>
+<td>0.260965</td>
+<td>-0.174715</td>
+<td>0.278843</td>
+<td>-0.206298</td>
+<td>-0.319604</td>
+<td>-0.055837</td>
+<td>-0.133185</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">TAATGGCAAATTGACACTCC</td>
+<td>0.258205</td>
+<td>0.103683</td>
+<td>0.428049</td>
+<td>-0.106268</td>
+<td>0.247864</td>
+<td>0.050536</td>
+<td>0.240706</td>
+<td>0.133009</td>
+<td>0.195027</td>
+<td>0.096144</td>
+<td>0.482377</td>
+<td>-0.168566</td>
+<td>-0.008969</td>
+<td>0.224936</td>
+<td>0.009979</td>
+<td>0.217354</td>
+<td>0.453491</td>
+<td>0.201961</td>
+<td>0.387054</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">GCTGCGCGCGGAGTTGTTCC</td>
+<td>-0.629856</td>
+<td>-0.381054</td>
+<td>-0.431536</td>
+<td>-0.328063</td>
+<td>-0.461695</td>
+<td>-0.258496</td>
+<td>-0.442414</td>
+<td>-0.358037</td>
+<td>-0.372732</td>
+<td>-0.359784</td>
+<td>-0.581490</td>
+<td>0.174623</td>
+<td>-0.984388</td>
+<td>-0.273490</td>
+<td>-0.490203</td>
+<td>-0.122278</td>
+<td>-0.562652</td>
+<td>-0.497605</td>
+<td>-0.959646</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">GCAACACGCCAGTAAGGTGT</td>
+<td>0.693416</td>
+<td>0.487153</td>
+<td>0.744586</td>
+<td>-0.054785</td>
+<td>0.474863</td>
+<td>0.585146</td>
+<td>0.162493</td>
+<td>0.388078</td>
+<td>0.733043</td>
+<td>0.280496</td>
+<td>0.167936</td>
+<td>0.605561</td>
+<td>0.400524</td>
+<td>0.051808</td>
+<td>0.422091</td>
+<td>0.098976</td>
+<td>0.294288</td>
+<td>0.064457</td>
+<td>0.376418</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">GATAGCCGGATAGCTTAAGG</td>
+<td>-0.245685</td>
+<td>-0.131631</td>
+<td>-0.429244</td>
+<td>-0.213968</td>
+<td>-0.271218</td>
+<td>-0.171113</td>
+<td>-0.015624</td>
+<td>-0.355447</td>
+<td>-0.236553</td>
+<td>-0.093049</td>
+<td>-0.299090</td>
+<td>-0.282985</td>
+<td>-0.134136</td>
+<td>-0.079377</td>
+<td>-0.211507</td>
+<td>-0.151722</td>
+<td>-0.154721</td>
+<td>-0.400835</td>
+<td>0.140210</td>
+</tr>
+</tbody>
+</table>
+
+<p>11503 rows × 19 columns</p>
+</div>
+</div>
+</div>
+</section>
+<section id="obtaining-the-sequence-context-of-the-variable-sequence-to-identify-sites-at-the-boundaries-of-the-variable-sequence" class="level3">
+<h3 class="anchored" data-anchor-id="obtaining-the-sequence-context-of-the-variable-sequence-to-identify-sites-at-the-boundaries-of-the-variable-sequence">2. Obtaining the sequence context of the variable sequence to identify sites at the boundaries of the variable sequence</h3>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L29" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="get_lib_seq_context" class="level3">
+<h3 class="anchored" data-anchor-id="get_lib_seq_context">get_lib_seq_context</h3>
+<blockquote class="blockquote">
+<pre><code> get_lib_seq_context (seqs, left, right)</code></pre>
+</blockquote>
+<p>*Generates a list of sequences by combining a left and right sequence with each sequence in the input list.</p>
+<p>Args: seqs (list): List of sequences to be combined. left (str): Left sequence to prepend. right (str): Right sequence to append.</p>
+<p>Returns: list: List of combined sequences.*</p>
+<div id="cell-6" class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>left, right <span class="op">=</span> <span class="st">"GTCCTAGGTATAATACTAGT"</span>, <span class="st">"GTTTTAGAGCTAGAAATAGC"</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>lib<span class="op">=</span>get_lib_seq_context(log2fc_df.index,left,right)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>lib[:<span class="dv">5</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>['GTCCTAGGTATAATACTAGTCGGAGGTACTGGGTACATTTGTTTTAGAGCTAGAAATAGC',
+ 'GTCCTAGGTATAATACTAGTTGGCGATAATGCCGGCTATCGTTTTAGAGCTAGAAATAGC',
+ 'GTCCTAGGTATAATACTAGTTTCCAGTTCACTGGTCTTCGGTTTTAGAGCTAGAAATAGC',
+ 'GTCCTAGGTATAATACTAGTAATTTCAGTGCCGTTCAGATGTTTTAGAGCTAGAAATAGC',
+ 'GTCCTAGGTATAATACTAGTCTGCGGTAATAATTCCCGCCGTTTTAGAGCTAGAAATAGC']</code></pre>
+</div>
+</div>
+</section>
+<section id="listing-all-the-sequence-motifs-found-in-our-library-that-follow-a-specific-pattern" class="level3">
+<h3 class="anchored" data-anchor-id="listing-all-the-sequence-motifs-found-in-our-library-that-follow-a-specific-pattern">3. Listing all the sequence motifs found in our library that follow a specific pattern</h3>
+<p>The pattern is a list of 3 numbers: 1. The number of defined bases in the first part of the site<br>
+2. The number of undefined bases in the middle<br>
+3. The number of defined bases in the second part of the site</p>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L48" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="get_sites_in_seq" class="level3">
+<h3 class="anchored" data-anchor-id="get_sites_in_seq">get_sites_in_seq</h3>
+<blockquote class="blockquote">
+<pre><code> get_sites_in_seq (lib, pattern=(3, 6, 4), no_ori=True)</code></pre>
+</blockquote>
+<p><em>Computes the list of unique sites matching the pattern present in each sequence of the library The pattern is a list of 3 number: 1. The number of defined bases in the first part of the site 2. The number of undefined bases in the middle 3. The number of defined bases in the second part of the site</em></p>
+<div id="cell-9" class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>lib<span class="op">=</span>get_lib_seq_context(log2fc_df.index,left,right)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>sites_in_seq<span class="op">=</span>get_sites_in_seq(lib,pattern<span class="op">=</span>(<span class="dv">3</span>,<span class="dv">6</span>,<span class="dv">4</span>),no_ori<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> <span class="bu">len</span>(sites_in_seq) <span class="op">==</span> <span class="bu">len</span>(lib)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"First 5 pattern matching sequences found in the first sequence of the library:"</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="bu">list</span>(sites_in_seq[<span class="dv">0</span>])[:<span class="dv">5</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>First 5 pattern matching sequences found in the first sequence of the library:</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>['AGCNNNNNNTAGC',
+ 'CTGNNNNNNTTTG',
+ 'TAGNNNNNNAAAT',
+ 'ACTNNNNNNATTT',
+ 'ACANNNNNNCCCA']</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L76" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="score" class="level3">
+<h3 class="anchored" data-anchor-id="score">score</h3>
+<blockquote class="blockquote">
+<pre><code> score (FCs, thr=-1)</code></pre>
+</blockquote>
+<p><em>Returns the fraction of sequences depleted below the thr value. Handles empty lists of FCs by returning 0.</em></p>
+<div id="cell-11" class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> score([<span class="op">-</span><span class="dv">2</span>,<span class="op">-</span><span class="fl">0.5</span>,<span class="op">-</span><span class="fl">0.1</span>,<span class="op">-</span><span class="dv">5</span>],thr<span class="op">=-</span><span class="dv">1</span>) <span class="op">==</span> <span class="fl">0.5</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L86" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="identify_depleted_motifs_scanning_ends" class="level3">
+<h3 class="anchored" data-anchor-id="identify_depleted_motifs_scanning_ends">identify_depleted_motifs_scanning_ends</h3>
+<blockquote class="blockquote">
+<pre><code> identify_depleted_motifs_scanning_ends (log2fc_series, scan_depth_k=6,
+                                         max_motif_length=6,
+                                         depletion_threshold=-1,
+                                         score_thr=0.85,
+                                         min_sequence_support=5)</code></pre>
+</blockquote>
+<p>*Identifies DNA motifs associated with sequence depletion by scanning k positions from both the left and right ends of sequences, using a pandas Series of log2FC values.</p>
+<p>Args: log2fc_series (pd.Series): pandas Series with sequences (DNA strings) as index and log2FC values as data. scan_depth_k (int): The number of positions to scan from each end (0 to k inclusive). max_motif_length (int): The maximum length of the motif to consider. depletion_threshold (float): The log2FC threshold for considering a sequence depleted. min_sequence_support (int): The minimum number of sequences (strictly greater than this value) a motif must be found in to be included in the results.</p>
+<p>Returns: pd.DataFrame: A DataFrame with identified motifs, their length, actual 0-indexed position, number of occurrences, average log2FC, and depletion score (fraction_depleted). Sorted by primary depletion metrics.*</p>
+<div id="cell-13" class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>depleted_motifs_df<span class="op">=</span>identify_depleted_motifs_scanning_ends(log2fc_df[<span class="st">"JJ1886_T0"</span>])</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>depleted_motifs_df.head(<span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Analyzing motifs of length 1 to 6, scanning positions 0 to 6 from each end, for JJ1886_T0.
+Minimum sequence support for a motif: &gt; 5 (i.e., 6 or more)</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">length</th>
+<th data-quarto-table-cell-role="th">position</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8695</td>
+<td>AAAAG</td>
+<td>5</td>
+<td>11</td>
+<td>10</td>
+<td>-5.662158</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">22013</td>
+<td>GTGCGG</td>
+<td>6</td>
+<td>0</td>
+<td>6</td>
+<td>-5.490821</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">12567</td>
+<td>AAAGT</td>
+<td>5</td>
+<td>12</td>
+<td>13</td>
+<td>-5.262390</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">12568</td>
+<td>CAAAG</td>
+<td>5</td>
+<td>11</td>
+<td>16</td>
+<td>-5.201596</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">17472</td>
+<td>GTGCG</td>
+<td>5</td>
+<td>0</td>
+<td>10</td>
+<td>-5.107176</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2571</td>
+<td>AAAG</td>
+<td>4</td>
+<td>12</td>
+<td>42</td>
+<td>-5.076919</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2580</td>
+<td>AAAGC</td>
+<td>5</td>
+<td>12</td>
+<td>9</td>
+<td>-5.029139</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">17128</td>
+<td>AAAGA</td>
+<td>5</td>
+<td>12</td>
+<td>13</td>
+<td>-4.996286</td>
+<td>1.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">10197</td>
+<td>GTGTC</td>
+<td>5</td>
+<td>0</td>
+<td>6</td>
+<td>-4.959089</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">23364</td>
+<td>AAAGG</td>
+<td>5</td>
+<td>12</td>
+<td>7</td>
+<td>-4.943650</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L191" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="filter_to_core_motifs" class="level3">
+<h3 class="anchored" data-anchor-id="filter_to_core_motifs">filter_to_core_motifs</h3>
+<blockquote class="blockquote">
+<pre><code> filter_to_core_motifs (depleted_motifs_df, score_improvement_margin=0.05)</code></pre>
+</blockquote>
+<p>*Filters a DataFrame of depleted motifs to identify underlying “core” motifs. A longer motif is kept only if it’s significantly better than a shorter core motif it contains.</p>
+<p>Args: depleted_motifs_df (pd.DataFrame): DataFrame from identify_depleted_motifs_scanning_ends. score_improvement_margin (float): A longer motif’s ‘fraction_depleted’ must be greater than the core motif’s score by this margin. fc_improvement_margin (float): A longer motif’s ‘avg_log2fc’ must be lower than the core motif’s avg_log2fc by this margin.</p>
+<p>Returns: pd.DataFrame: A filtered DataFrame containing potentially core motifs.*</p>
+<div id="cell-15" class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>depleted_motifs_df<span class="op">=</span>filter_to_core_motifs(depleted_motifs_df)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>depleted_motifs_df.head(<span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">length</th>
+<th data-quarto-table-cell-role="th">position</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>GTG</td>
+<td>3</td>
+<td>0</td>
+<td>187</td>
+<td>-4.764500</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>AAAG</td>
+<td>4</td>
+<td>12</td>
+<td>42</td>
+<td>-5.076919</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L249" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="get_fold_change_values_per_site" class="level3">
+<h3 class="anchored" data-anchor-id="get_fold_change_values_per_site">get_fold_change_values_per_site</h3>
+<blockquote class="blockquote">
+<pre><code> get_fold_change_values_per_site (site_sets_list, fold_changes_list)</code></pre>
+</blockquote>
+<p>*Computes a dictionary mapping each unique site to a list of its associated log2 Fold Change (FC) values.</p>
+<p>Args: site_sets_list (list): A list of sets, where each set contains the sequence motifs found in a member of the library. fold_changes_list (list): A list of log2FC values, corresponding to each sequence in the library.</p>
+<p>Returns: dict: A dictionary where keys are sequence motifs and values are numpy arrays containing the log2FC values associated with that site.*</p>
+<div id="cell-17" class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>pattern<span class="op">=</span>(<span class="dv">3</span>,<span class="dv">6</span>,<span class="dv">4</span>)</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>set_list<span class="op">=</span>get_sites_in_seq(lib,pattern<span class="op">=</span>pattern,no_ori<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>site_FCs<span class="op">=</span>get_fold_change_values_per_site(set_list,log2fc_df[<span class="st">"JJ1886_T0"</span>].values)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>site_FCs[<span class="st">"AGCNNNNNNGGGA"</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>array([ 0.02025893, -0.15083807,  0.19052559,  0.04266223,  0.22493562,
+       -0.13188093,  0.0203179 ,  0.10373391, -0.18265707,  0.24137364,
+       -0.10160173,  0.5539999 ,  0.19568499,  0.29179059, -0.02109236,
+       -0.46896125,  0.00812423])</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L288" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="filter_sequences_without_core_motifs" class="level3">
+<h3 class="anchored" data-anchor-id="filter_sequences_without_core_motifs">filter_sequences_without_core_motifs</h3>
+<blockquote class="blockquote">
+<pre><code> filter_sequences_without_core_motifs (log2fc_series, core_motifs_df)</code></pre>
+</blockquote>
+<p>*Filters an original log2fc Series to remove sequences that contain any of the specified core motifs.</p>
+<p>Args: log2fc_series (pd.Series): Series with sequences as its index and log2FC values. core_motifs_df (pd.DataFrame): DataFrame of core motifs, must include ‘motif’, ‘position’, and ‘length’ columns.</p>
+<p>Returns: pd.Series: A new Series containing only sequences (and their log2FC values) from log2fc_series that do not carry any of the core motifs.*</p>
+<div id="cell-19" class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>filted_log2fc_df <span class="op">=</span> filter_sequences_without_core_motifs(log2fc_df, depleted_motifs_df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L343" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="get_sites_scores" class="level3">
+<h3 class="anchored" data-anchor-id="get_sites_scores">get_sites_scores</h3>
+<blockquote class="blockquote">
+<pre><code> get_sites_scores (site_FCs, pattern, log2FC_thr=-1)</code></pre>
+</blockquote>
+<p><em>Scores sites based on depletion and occurrence. Returns a pandas DataFrame with ‘site’, ‘fraction_depleted’, ‘num_sequences’, ‘avg_log2fc’.</em></p>
+<div id="cell-21" class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>site_scores <span class="op">=</span> get_sites_scores(site_FCs,pattern)</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>site_scores.sort_values(by<span class="op">=</span>[<span class="st">'fraction_depleted'</span>, <span class="st">'num_sequences'</span>], ascending<span class="op">=</span>[<span class="va">False</span>, <span class="va">False</span>]).head(<span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2652</td>
+<td>AGGNNNNNNCCTC</td>
+<td>1.000000</td>
+<td>1</td>
+<td>-4.601867</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">8786</td>
+<td>GAGNNNNNNCCCC</td>
+<td>1.000000</td>
+<td>1</td>
+<td>-1.406262</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4410</td>
+<td>CACNNNNNNATTA</td>
+<td>0.958974</td>
+<td>195</td>
+<td>-4.569183</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">952</td>
+<td>AATNNNNNNGTGC</td>
+<td>0.826923</td>
+<td>52</td>
+<td>-3.962960</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">953</td>
+<td>AATNNNNNNGTGG</td>
+<td>0.815385</td>
+<td>65</td>
+<td>-3.883041</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">12519</td>
+<td>TAANNNNNNTGTG</td>
+<td>0.785714</td>
+<td>238</td>
+<td>-3.746732</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">951</td>
+<td>AATNNNNNNGTGA</td>
+<td>0.771429</td>
+<td>70</td>
+<td>-3.628320</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">8882</td>
+<td>GAGNNNNNNGTCT</td>
+<td>0.750000</td>
+<td>4</td>
+<td>-4.012801</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">954</td>
+<td>AATNNNNNNGTGT</td>
+<td>0.740741</td>
+<td>54</td>
+<td>-3.485249</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">11042</td>
+<td>GGTNNNNNNAGGA</td>
+<td>0.666667</td>
+<td>3</td>
+<td>-2.235343</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L370" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="filter_to_core_flexible_motifs" class="level3">
+<h3 class="anchored" data-anchor-id="filter_to_core_flexible_motifs">filter_to_core_flexible_motifs</h3>
+<blockquote class="blockquote">
+<pre><code> filter_to_core_flexible_motifs (flexible_motifs_df, score_margin=0.05)</code></pre>
+</blockquote>
+<p>*Filters a DataFrame of flexible (position-independent) motifs to identify underlying “core” motifs. A longer/more complex motif is removed if its score is not significantly better than a simpler core motif pattern it contains.</p>
+<p>Args: flexible_motifs_df (pd.DataFrame): DataFrame with ‘site’, ‘pattern’ (string like ‘(3,4,4)’), ‘fraction_depleted’, ‘num_sequences’, ‘avg_log2fc’. score_margin (float): A more complex motif is subsumed if its ‘fraction_depleted’ is not better than (core_score - score_margin). Effectively, if candidate_score &gt;= core_score - score_margin, it’s subsumed.</p>
+<p>Returns: pd.DataFrame: A filtered DataFrame containing potentially core flexible motifs.*</p>
+<div id="cell-23" class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> analyze_motif_pipeline(log2fc_series, </span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>                           left_context_str, </span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>                           right_context_str, </span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>                           fixed_motif_scan_depth_k<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>                           fixed_motif_max_length<span class="op">=</span><span class="dv">6</span>,</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>                           fixed_motif_depletion_thr<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>                           fixed_motif_score_thr<span class="op">=</span><span class="fl">0.8</span>,</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>                           fixed_motif_min_support<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>                           core_motif_score_margin<span class="op">=</span><span class="fl">0.05</span>, <span class="co"># For fixed motifs</span></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>                           flexible_motif_patterns<span class="op">=</span>[(<span class="dv">6</span>,<span class="dv">0</span>,<span class="dv">0</span>),(<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">4</span>)], </span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>                           flexible_motif_log2fc_thr<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>                           flexible_motif_min_support<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>                           flexible_motif_score_thr<span class="op">=</span><span class="fl">0.8</span>,</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>                           core_flexible_motif_score_margin<span class="op">=</span><span class="fl">0.05</span> <span class="co"># For flexible motifs</span></span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>                           ):</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a><span class="co">    Full pipeline to identify fixed-position core motifs and then position-independent motifs</span></span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a><span class="co">    (from a list of patterns) in the remaining sequences (with context for flexible search).</span></span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"--- Starting Fixed-Position Motif Analysis (on original short sequences) ---"</span>)</span>
+<span id="cb24-21"><a href="#cb24-21" aria-hidden="true" tabindex="-1"></a>    depleted_fixed_motifs_df <span class="op">=</span> identify_depleted_motifs_scanning_ends(</span>
+<span id="cb24-22"><a href="#cb24-22" aria-hidden="true" tabindex="-1"></a>        log2fc_series, </span>
+<span id="cb24-23"><a href="#cb24-23" aria-hidden="true" tabindex="-1"></a>        scan_depth_k<span class="op">=</span>fixed_motif_scan_depth_k,</span>
+<span id="cb24-24"><a href="#cb24-24" aria-hidden="true" tabindex="-1"></a>        max_motif_length<span class="op">=</span>fixed_motif_max_length,</span>
+<span id="cb24-25"><a href="#cb24-25" aria-hidden="true" tabindex="-1"></a>        depletion_threshold<span class="op">=</span>fixed_motif_depletion_thr,</span>
+<span id="cb24-26"><a href="#cb24-26" aria-hidden="true" tabindex="-1"></a>        score_thr<span class="op">=</span>fixed_motif_score_thr,</span>
+<span id="cb24-27"><a href="#cb24-27" aria-hidden="true" tabindex="-1"></a>        min_sequence_support<span class="op">=</span>fixed_motif_min_support</span>
+<span id="cb24-28"><a href="#cb24-28" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb24-29"><a href="#cb24-29" aria-hidden="true" tabindex="-1"></a>    core_fixed_motifs_df <span class="op">=</span> filter_to_core_motifs( </span>
+<span id="cb24-30"><a href="#cb24-30" aria-hidden="true" tabindex="-1"></a>        depleted_fixed_motifs_df,</span>
+<span id="cb24-31"><a href="#cb24-31" aria-hidden="true" tabindex="-1"></a>        score_improvement_margin<span class="op">=</span>core_motif_score_margin</span>
+<span id="cb24-32"><a href="#cb24-32" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb24-33"><a href="#cb24-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> core_fixed_motifs_df.empty:</span>
+<span id="cb24-34"><a href="#cb24-34" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No core motifs found at fixed positions."</span>)</span>
+<span id="cb24-35"><a href="#cb24-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb24-36"><a href="#cb24-36" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Found </span><span class="sc">{</span><span class="bu">len</span>(core_fixed_motifs_df)<span class="sc">}</span><span class="ss"> core motifs at fixed positions:"</span>)</span>
+<span id="cb24-37"><a href="#cb24-37" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> _, row <span class="kw">in</span> core_fixed_motifs_df.iterrows():</span>
+<span id="cb24-38"><a href="#cb24-38" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"  - Fixed Motif: </span><span class="sc">{</span>row[<span class="st">'motif'</span>]<span class="sc">}</span><span class="ss">, Pos: </span><span class="sc">{</span>row[<span class="st">'position'</span>]<span class="sc">}</span><span class="ss">, Len: </span><span class="sc">{</span>row[<span class="st">'length'</span>]<span class="sc">}</span><span class="ss">, FracDep: </span><span class="sc">{</span>row[<span class="st">'fraction_depleted'</span>]<span class="sc">:.2f}</span><span class="ss">, AvgFC: </span><span class="sc">{</span>row[<span class="st">'avg_log2fc'</span>]<span class="sc">:.2f}</span><span class="ss">, N: </span><span class="sc">{</span>row[<span class="st">'num_sequences'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb24-39"><a href="#cb24-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-40"><a href="#cb24-40" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">"</span><span class="ch">\n</span><span class="st">--- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---"</span>)</span>
+<span id="cb24-41"><a href="#cb24-41" aria-hidden="true" tabindex="-1"></a>    log2fc_series_for_flexible_analysis <span class="op">=</span> filter_sequences_without_core_motifs(</span>
+<span id="cb24-42"><a href="#cb24-42" aria-hidden="true" tabindex="-1"></a>        log2fc_series, </span>
+<span id="cb24-43"><a href="#cb24-43" aria-hidden="true" tabindex="-1"></a>        core_fixed_motifs_df </span>
+<span id="cb24-44"><a href="#cb24-44" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb24-45"><a href="#cb24-45" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">len</span>(log2fc_series_for_flexible_analysis) <span class="op">==</span> <span class="bu">len</span>(log2fc_series):</span>
+<span id="cb24-46"><a href="#cb24-46" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No sequences were filtered out based on fixed-position core motifs (or no core motifs found)."</span>)</span>
+<span id="cb24-47"><a href="#cb24-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb24-48"><a href="#cb24-48" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"Filtered log2fc_series for flexible analysis: </span><span class="sc">{</span><span class="bu">len</span>(log2fc_series_for_flexible_analysis)<span class="sc">}</span><span class="ss"> sequences remaining."</span>)</span>
+<span id="cb24-49"><a href="#cb24-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-50"><a href="#cb24-50" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> log2fc_series_for_flexible_analysis.empty:</span>
+<span id="cb24-51"><a href="#cb24-51" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No sequences remaining for flexible motif analysis after filtering."</span>)</span>
+<span id="cb24-52"><a href="#cb24-52" aria-hidden="true" tabindex="-1"></a>        flexible_motifs_results_df <span class="op">=</span> pd.DataFrame(columns<span class="op">=</span>[<span class="st">'motif'</span>, <span class="st">'pattern'</span>, <span class="st">'fraction_depleted'</span>, <span class="st">'num_sequences'</span>, <span class="st">'avg_log2fc'</span>]) </span>
+<span id="cb24-53"><a href="#cb24-53" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> core_fixed_motifs_df, flexible_motifs_results_df</span>
+<span id="cb24-54"><a href="#cb24-54" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-55"><a href="#cb24-55" aria-hidden="true" tabindex="-1"></a>    short_sequences_for_flex_analysis <span class="op">=</span> log2fc_series_for_flexible_analysis.index.tolist()</span>
+<span id="cb24-56"><a href="#cb24-56" aria-hidden="true" tabindex="-1"></a>    sequences_with_context_for_flex <span class="op">=</span> get_lib_seq_context(</span>
+<span id="cb24-57"><a href="#cb24-57" aria-hidden="true" tabindex="-1"></a>        short_sequences_for_flex_analysis, </span>
+<span id="cb24-58"><a href="#cb24-58" aria-hidden="true" tabindex="-1"></a>        left_context_str, </span>
+<span id="cb24-59"><a href="#cb24-59" aria-hidden="true" tabindex="-1"></a>        right_context_str</span>
+<span id="cb24-60"><a href="#cb24-60" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb24-61"><a href="#cb24-61" aria-hidden="true" tabindex="-1"></a>    fc_values_for_flexible_analysis <span class="op">=</span> log2fc_series_for_flexible_analysis.tolist()</span>
+<span id="cb24-62"><a href="#cb24-62" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb24-63"><a href="#cb24-63" aria-hidden="true" tabindex="-1"></a>    all_flexible_motifs_data_list <span class="op">=</span> [] </span>
+<span id="cb24-64"><a href="#cb24-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-65"><a href="#cb24-65" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> <span class="bu">isinstance</span>(flexible_motif_patterns, <span class="bu">list</span>):</span>
+<span id="cb24-66"><a href="#cb24-66" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"Warning: flexible_motif_patterns should be a list. Wrapping it in a list."</span>)</span>
+<span id="cb24-67"><a href="#cb24-67" aria-hidden="true" tabindex="-1"></a>        flexible_motif_patterns <span class="op">=</span> [flexible_motif_patterns]</span>
+<span id="cb24-68"><a href="#cb24-68" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb24-69"><a href="#cb24-69" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> current_flex_pattern <span class="kw">in</span> flexible_motif_patterns:</span>
+<span id="cb24-70"><a href="#cb24-70" aria-hidden="true" tabindex="-1"></a>        <span class="co"># print(f"  Pattern: {current_flex_pattern}") # Reduced verbosity</span></span>
+<span id="cb24-71"><a href="#cb24-71" aria-hidden="true" tabindex="-1"></a>        site_sets_flexible <span class="op">=</span> get_sites_in_seq(</span>
+<span id="cb24-72"><a href="#cb24-72" aria-hidden="true" tabindex="-1"></a>            sequences_with_context_for_flex, </span>
+<span id="cb24-73"><a href="#cb24-73" aria-hidden="true" tabindex="-1"></a>            pattern<span class="op">=</span>current_flex_pattern, </span>
+<span id="cb24-74"><a href="#cb24-74" aria-hidden="true" tabindex="-1"></a>            no_ori<span class="op">=</span><span class="va">True</span> </span>
+<span id="cb24-75"><a href="#cb24-75" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb24-76"><a href="#cb24-76" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="bu">len</span>(site_sets_flexible) <span class="op">!=</span> <span class="bu">len</span>(fc_values_for_flexible_analysis):</span>
+<span id="cb24-77"><a href="#cb24-77" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"    Error: Mismatch in length between site sets (</span><span class="sc">{</span><span class="bu">len</span>(site_sets_flexible)<span class="sc">}</span><span class="ss">) and FC values (</span><span class="sc">{</span><span class="bu">len</span>(fc_values_for_flexible_analysis)<span class="sc">}</span><span class="ss">) for pattern </span><span class="sc">{</span>current_flex_pattern<span class="sc">}</span><span class="ss">. Skipping this pattern."</span>)</span>
+<span id="cb24-78"><a href="#cb24-78" aria-hidden="true" tabindex="-1"></a>            <span class="cf">continue</span></span>
+<span id="cb24-79"><a href="#cb24-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-80"><a href="#cb24-80" aria-hidden="true" tabindex="-1"></a>        site_fcs_flexible <span class="op">=</span> get_fold_change_values_per_site(</span>
+<span id="cb24-81"><a href="#cb24-81" aria-hidden="true" tabindex="-1"></a>            site_sets_flexible,</span>
+<span id="cb24-82"><a href="#cb24-82" aria-hidden="true" tabindex="-1"></a>            fc_values_for_flexible_analysis </span>
+<span id="cb24-83"><a href="#cb24-83" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb24-84"><a href="#cb24-84" aria-hidden="true" tabindex="-1"></a>        current_pattern_scores_df <span class="op">=</span> get_sites_scores( </span>
+<span id="cb24-85"><a href="#cb24-85" aria-hidden="true" tabindex="-1"></a>            site_fcs_flexible,</span>
+<span id="cb24-86"><a href="#cb24-86" aria-hidden="true" tabindex="-1"></a>            pattern<span class="op">=</span>current_flex_pattern, </span>
+<span id="cb24-87"><a href="#cb24-87" aria-hidden="true" tabindex="-1"></a>            log2FC_thr<span class="op">=</span>flexible_motif_log2fc_thr</span>
+<span id="cb24-88"><a href="#cb24-88" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb24-89"><a href="#cb24-89" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb24-90"><a href="#cb24-90" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> current_pattern_scores_df.empty:</span>
+<span id="cb24-91"><a href="#cb24-91" aria-hidden="true" tabindex="-1"></a>            current_pattern_scores_df.rename(columns<span class="op">=</span>{<span class="st">'site'</span>: <span class="st">'motif'</span>}, inplace<span class="op">=</span><span class="va">True</span>) </span>
+<span id="cb24-92"><a href="#cb24-92" aria-hidden="true" tabindex="-1"></a>            current_pattern_scores_df[<span class="st">'pattern'</span>] <span class="op">=</span> <span class="bu">str</span>(current_flex_pattern) </span>
+<span id="cb24-93"><a href="#cb24-93" aria-hidden="true" tabindex="-1"></a>            filtered_for_this_pattern <span class="op">=</span> current_pattern_scores_df[</span>
+<span id="cb24-94"><a href="#cb24-94" aria-hidden="true" tabindex="-1"></a>                (current_pattern_scores_df[<span class="st">'fraction_depleted'</span>] <span class="op">&gt;</span> flexible_motif_score_thr) <span class="op">&amp;</span></span>
+<span id="cb24-95"><a href="#cb24-95" aria-hidden="true" tabindex="-1"></a>                (current_pattern_scores_df[<span class="st">'num_sequences'</span>] <span class="op">&gt;</span> flexible_motif_min_support)</span>
+<span id="cb24-96"><a href="#cb24-96" aria-hidden="true" tabindex="-1"></a>            ]</span>
+<span id="cb24-97"><a href="#cb24-97" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="kw">not</span> filtered_for_this_pattern.empty:</span>
+<span id="cb24-98"><a href="#cb24-98" aria-hidden="true" tabindex="-1"></a>                all_flexible_motifs_data_list.append(filtered_for_this_pattern)</span>
+<span id="cb24-99"><a href="#cb24-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-100"><a href="#cb24-100" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> all_flexible_motifs_data_list:</span>
+<span id="cb24-101"><a href="#cb24-101" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">No flexible motifs found meeting initial support &gt; </span><span class="sc">{</span>flexible_motif_min_support<span class="sc">}</span><span class="ss"> and score &gt; </span><span class="sc">{</span>flexible_motif_score_thr<span class="sc">}</span><span class="ss"> for any provided pattern."</span>)</span>
+<span id="cb24-102"><a href="#cb24-102" aria-hidden="true" tabindex="-1"></a>        flexible_motifs_results_df <span class="op">=</span> pd.DataFrame(columns<span class="op">=</span>[<span class="st">'motif'</span>, <span class="st">'pattern'</span>, <span class="st">'fraction_depleted'</span>, <span class="st">'num_sequences'</span>, <span class="st">'avg_log2fc'</span>]) </span>
+<span id="cb24-103"><a href="#cb24-103" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
+<span id="cb24-104"><a href="#cb24-104" aria-hidden="true" tabindex="-1"></a>        combined_flexible_motifs_df <span class="op">=</span> pd.concat(all_flexible_motifs_data_list, ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb24-105"><a href="#cb24-105" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="ch">\n</span><span class="ss">Identified </span><span class="sc">{</span><span class="bu">len</span>(combined_flexible_motifs_df)<span class="sc">}</span><span class="ss"> raw flexible motifs. Now filtering to core flexible motifs..."</span>)</span>
+<span id="cb24-106"><a href="#cb24-106" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb24-107"><a href="#cb24-107" aria-hidden="true" tabindex="-1"></a>        flexible_motifs_results_df <span class="op">=</span> filter_to_core_flexible_motifs( </span>
+<span id="cb24-108"><a href="#cb24-108" aria-hidden="true" tabindex="-1"></a>            combined_flexible_motifs_df,</span>
+<span id="cb24-109"><a href="#cb24-109" aria-hidden="true" tabindex="-1"></a>            score_margin<span class="op">=</span>core_flexible_motif_score_margin </span>
+<span id="cb24-110"><a href="#cb24-110" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb24-111"><a href="#cb24-111" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> flexible_motifs_results_df.empty:</span>
+<span id="cb24-112"><a href="#cb24-112" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="st">"No core flexible motifs remained after filtering."</span>)</span>
+<span id="cb24-113"><a href="#cb24-113" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb24-114"><a href="#cb24-114" aria-hidden="true" tabindex="-1"></a>            <span class="bu">print</span>(<span class="ss">f"Found </span><span class="sc">{</span><span class="bu">len</span>(flexible_motifs_results_df)<span class="sc">}</span><span class="ss"> core flexible motifs:"</span>)</span>
+<span id="cb24-115"><a href="#cb24-115" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> _, row <span class="kw">in</span> flexible_motifs_results_df.iterrows():</span>
+<span id="cb24-116"><a href="#cb24-116" aria-hidden="true" tabindex="-1"></a>                 <span class="bu">print</span>(<span class="ss">f"  - Flex Motif: </span><span class="sc">{</span>row[<span class="st">'motif'</span>]<span class="sc">}</span><span class="ss"> (from pattern </span><span class="sc">{</span>row[<span class="st">'pattern'</span>]<span class="sc">}</span><span class="ss">), FracDep: </span><span class="sc">{</span>row[<span class="st">'fraction_depleted'</span>]<span class="sc">:.2f}</span><span class="ss">, AvgFC: </span><span class="sc">{</span>row[<span class="st">'avg_log2fc'</span>]<span class="sc">:.2f}</span><span class="ss">, N: </span><span class="sc">{</span>row[<span class="st">'num_sequences'</span>]<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb24-117"><a href="#cb24-117" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb24-118"><a href="#cb24-118" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> core_fixed_motifs_df, flexible_motifs_results_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-24" class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>core_fixed_motifs_df, flexible_motifs_df <span class="op">=</span> analyze_motif_pipeline(log2fc_df[<span class="st">"JJ1886_T0"</span>], </span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>                        left,</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>                        right, </span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>                        fixed_motif_scan_depth_k<span class="op">=</span><span class="dv">6</span>,</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>                        fixed_motif_max_length<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>                        fixed_motif_depletion_thr<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>                        fixed_motif_score_thr<span class="op">=</span><span class="fl">0.85</span>,</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>                        fixed_motif_min_support<span class="op">=</span><span class="dv">5</span>,</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>                        core_motif_score_margin<span class="op">=</span><span class="fl">0.05</span>,</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>                        flexible_motif_patterns<span class="op">=</span>[(<span class="dv">6</span>,<span class="dv">0</span>,<span class="dv">0</span>),(<span class="dv">4</span>,<span class="dv">4</span>,<span class="dv">4</span>),(<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">4</span>),(<span class="dv">2</span>,<span class="dv">4</span>,<span class="dv">3</span>),(<span class="dv">3</span>,<span class="dv">5</span>,<span class="dv">4</span>)],</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>                        flexible_motif_log2fc_thr<span class="op">=-</span><span class="dv">1</span>,</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>                        flexible_motif_min_support<span class="op">=</span><span class="dv">3</span>,</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>                        flexible_motif_score_thr<span class="op">=</span><span class="fl">0.85</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>                        )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>--- Starting Fixed-Position Motif Analysis (on original short sequences) ---
+Analyzing motifs of length 1 to 5, scanning positions 0 to 6 from each end, for JJ1886_T0.
+Minimum sequence support for a motif: &gt; 5 (i.e., 6 or more)
+Found 2 core motifs at fixed positions:
+  - Fixed Motif: GTG, Pos: 0, Len: 3, FracDep: 1.00, AvgFC: -4.76, N: 187
+  - Fixed Motif: AAAG, Pos: 12, Len: 4, FracDep: 1.00, AvgFC: -5.08, N: 42
+
+--- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---
+Filtered log2fc_series for flexible analysis: 11275 sequences remaining.
+
+Identified 21 raw flexible motifs. Now filtering to core flexible motifs...
+Found 5 core flexible motifs:
+  - Flex Motif: GAGACC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
+  - Flex Motif: AACNNNNCTTT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.33, N: 21
+  - Flex Motif: CACNNNNGTAC (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.24, N: 20
+  - Flex Motif: CACNNNNGTAT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -4.43, N: 5
+  - Flex Motif: GACCNNNNCCTC (from pattern (4, 4, 4)), FracDep: 1.00, AvgFC: -4.36, N: 4</code></pre>
+</div>
+</div>
+<div id="cell-25" class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>core_fixed_motifs_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">length</th>
+<th data-quarto-table-cell-role="th">position</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>GTG</td>
+<td>3</td>
+<td>0</td>
+<td>187</td>
+<td>-4.764500</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>AAAG</td>
+<td>4</td>
+<td>12</td>
+<td>42</td>
+<td>-5.076919</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="cell-26" class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>flexible_motifs_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>GAGACC</td>
+<td>1.0</td>
+<td>9</td>
+<td>-4.313837</td>
+<td>(6, 0, 0)</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>AACNNNNCTTT</td>
+<td>1.0</td>
+<td>21</td>
+<td>-5.325198</td>
+<td>(3, 4, 4)</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>CACNNNNGTAC</td>
+<td>1.0</td>
+<td>20</td>
+<td>-5.237623</td>
+<td>(3, 4, 4)</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>CACNNNNGTAT</td>
+<td>1.0</td>
+<td>5</td>
+<td>-4.428066</td>
+<td>(3, 4, 4)</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>GACCNNNNCCTC</td>
+<td>1.0</td>
+<td>4</td>
+<td>-4.357958</td>
+<td>(4, 4, 4)</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="cell-27" class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_flexible_motif_presence_in_library(short_sequences_list, left_context, right_context, flexible_motifs_df):</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="co">    Creates a DataFrame indicating the presence of flexible motifs in sequences (with context).</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="co">    Args:</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="co">        short_sequences_list (list): List of original short DNA sequences.</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a><span class="co">        left_context (str): Left context string to prepend.</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="co">        right_context (str): Right context string to append.</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a><span class="co">        flexible_motifs_df (pd.DataFrame): DataFrame of flexible motifs, must include</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="co">                                           a 'motif' column with motif strings (e.g., 'AACNNNNCTTT').</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a><span class="co">    Returns:</span></span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a><span class="co">        pd.DataFrame: DataFrame with full sequences (with context) as index,</span></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a><span class="co">                      flexible motif strings as columns, and boolean values indicating presence.</span></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> <span class="bu">isinstance</span>(short_sequences_list, <span class="bu">list</span>):</span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"Error: short_sequences_list must be a list."</span>)</span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pd.DataFrame()</span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> <span class="bu">isinstance</span>(flexible_motifs_df, pd.DataFrame) <span class="kw">or</span> <span class="st">'motif'</span> <span class="kw">not</span> <span class="kw">in</span> flexible_motifs_df.columns:</span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"Error: flexible_motifs_df is invalid or missing 'motif' column."</span>)</span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pd.DataFrame()</span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>    full_sequences_with_context <span class="op">=</span> get_lib_seq_context(short_sequences_list, left_context, right_context)</span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Filter out None entries from full_sequences_with_context which may arise from non-string inputs to get_lib_seq_context</span></span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>    <span class="co"># and keep track of original indices to align with short_sequences_list if needed for other purposes,</span></span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>    <span class="co"># though for this function, we just use the valid full sequences.</span></span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a>    valid_full_sequences <span class="op">=</span> [seq <span class="cf">for</span> seq <span class="kw">in</span> full_sequences_with_context <span class="cf">if</span> <span class="bu">isinstance</span>(seq, <span class="bu">str</span>)]</span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> valid_full_sequences:</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="st">"No valid full sequences to process after adding context."</span>)</span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pd.DataFrame()</span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>    unique_flexible_motifs <span class="op">=</span> flexible_motifs_df[<span class="st">'motif'</span>].unique()</span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>    presence_data <span class="op">=</span> []</span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> full_seq_str <span class="kw">in</span> valid_full_sequences:</span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>        row_data <span class="op">=</span> {<span class="st">'full_sequence'</span>: full_seq_str}</span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> flex_motif_str <span class="kw">in</span> unique_flexible_motifs:</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> <span class="kw">not</span> <span class="bu">isinstance</span>(flex_motif_str, <span class="bu">str</span>) <span class="kw">or</span> <span class="kw">not</span> flex_motif_str:</span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>                row_data[flex_motif_str] <span class="op">=</span> <span class="va">False</span> <span class="co"># Or handle as error/skip</span></span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>                <span class="cf">continue</span></span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a>            </span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>            <span class="co"># Convert 'N' to '[ATGC]' for regex matching</span></span>
+<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>            regex_pattern <span class="op">=</span> flex_motif_str.replace(<span class="st">'N'</span>, <span class="st">'[ATGC]'</span>)</span>
+<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
+<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> re.search(regex_pattern, full_seq_str):</span>
+<span id="cb29-48"><a href="#cb29-48" aria-hidden="true" tabindex="-1"></a>                    row_data[flex_motif_str] <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb29-49"><a href="#cb29-49" aria-hidden="true" tabindex="-1"></a>                <span class="cf">elif</span> re.search(regex_pattern, revcomp(full_seq_str)):</span>
+<span id="cb29-50"><a href="#cb29-50" aria-hidden="true" tabindex="-1"></a>                    row_data[flex_motif_str] <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb29-51"><a href="#cb29-51" aria-hidden="true" tabindex="-1"></a>                <span class="cf">else</span>:</span>
+<span id="cb29-52"><a href="#cb29-52" aria-hidden="true" tabindex="-1"></a>                    row_data[flex_motif_str] <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb29-53"><a href="#cb29-53" aria-hidden="true" tabindex="-1"></a>            <span class="cf">except</span> re.error:</span>
+<span id="cb29-54"><a href="#cb29-54" aria-hidden="true" tabindex="-1"></a>                <span class="co"># print(f"Warning: Regex error for motif '{flex_motif_str}' (pattern: '{regex_pattern}'). Marking as False.")</span></span>
+<span id="cb29-55"><a href="#cb29-55" aria-hidden="true" tabindex="-1"></a>                row_data[flex_motif_str] <span class="op">=</span> <span class="va">False</span></span>
+<span id="cb29-56"><a href="#cb29-56" aria-hidden="true" tabindex="-1"></a>        presence_data.append(row_data)</span>
+<span id="cb29-57"><a href="#cb29-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-58"><a href="#cb29-58" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> presence_data:</span>
+<span id="cb29-59"><a href="#cb29-59" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> pd.DataFrame(index<span class="op">=</span>valid_full_sequences, columns<span class="op">=</span>unique_flexible_motifs)</span>
+<span id="cb29-60"><a href="#cb29-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-61"><a href="#cb29-61" aria-hidden="true" tabindex="-1"></a>    presence_df <span class="op">=</span> pd.DataFrame(presence_data)</span>
+<span id="cb29-62"><a href="#cb29-62" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="st">'full_sequence'</span> <span class="kw">in</span> presence_df.columns:</span>
+<span id="cb29-63"><a href="#cb29-63" aria-hidden="true" tabindex="-1"></a>        presence_df <span class="op">=</span> presence_df.set_index(<span class="st">'full_sequence'</span>)</span>
+<span id="cb29-64"><a href="#cb29-64" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb29-65"><a href="#cb29-65" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> presence_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="cell-28" class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>motif_presence_df <span class="op">=</span> get_flexible_motif_presence_in_library(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>            short_sequences_list<span class="op">=</span>counts.index.tolist(),</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>            left_context<span class="op">=</span>left.upper(),</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>            right_context<span class="op">=</span>right.upper(),</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>            flexible_motifs_df<span class="op">=</span>flexible_motifs_df <span class="co"># Use the output from the pipeline</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>motif_presence_df.loc[motif_presence_df[<span class="st">"GACCNNNNCCTC"</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">GAGACC</th>
+<th data-quarto-table-cell-role="th">AACNNNNCTTT</th>
+<th data-quarto-table-cell-role="th">CACNNNNGTAC</th>
+<th data-quarto-table-cell-role="th">CACNNNNGTAT</th>
+<th data-quarto-table-cell-role="th">GACCNNNNCCTC</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">full_sequence</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">GTCCTAGGTATAATACTAGTGAGGTTCAGGTCATGACCAAGTTTTAGAGCTAGAAATAGC</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">GTCCTAGGTATAATACTAGTCCTGAGACCTCTGCCTCCGGGTTTTAGAGCTAGAAATAGC</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>True</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">GTCCTAGGTATAATACTAGTCTGAGACCTCTGCCTCCGGAGTTTTAGAGCTAGAAATAGC</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">GTCCTAGGTATAATACTAGTGAACCTGAGACCTCTGCCTCGTTTTAGAGCTAGAAATAGC</td>
+<td>True</td>
+<td>False</td>
+<td>False</td>
+<td>False</td>
+<td>True</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="cell-29" class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> motif <span class="kw">in</span> motif_presence_df.columns:</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> motif_presence_df.loc[motif_presence_df[motif]].copy()</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    df <span class="op">=</span> df.drop(columns<span class="op">=</span>[motif])</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    other_site_found <span class="op">=</span> df.<span class="bu">any</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    freq_of_other_site_found <span class="op">=</span> np.<span class="bu">sum</span>(other_site_found) <span class="op">/</span> <span class="bu">len</span>(other_site_found)</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(motif, freq_of_other_site_found)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>GAGACC 0.3333333333333333
+AACNNNNCTTT 0.031746031746031744
+CACNNNNGTAC 0.05
+CACNNNNGTAT 0.005208333333333333
+GACCNNNNCCTC 0.75</code></pre>
+</div>
+</div>
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/core.py#L464" target="_blank" style="float:right; font-size:smaller">source</a></p>
+</section>
+<section id="plot_flexible_motif_analysis" class="level3">
+<h3 class="anchored" data-anchor-id="plot_flexible_motif_analysis">plot_flexible_motif_analysis</h3>
+<blockquote class="blockquote">
+<pre><code> plot_flexible_motif_analysis (counts_df, sample_col, ref_col,
+                               flexible_motifs_df, left_context_str,
+                               right_context_str, title_main='Flexible
+                               Motif Analysis', pseudocount=1)</code></pre>
+</blockquote>
+<p><em>Generates two subplots for FLEXIBLE (position-independent) motifs, considering sequence context. Uses get_flexible_motif_presence_in_library to simplify highlighting.</em></p>
+<div id="cell-31" class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>plot_flexible_motif_analysis(counts, <span class="st">"JJ1886_T0"</span>, <span class="st">"MFDpir"</span>, flexible_motifs_df, left, right)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="00_core_files/figure-html/cell-28-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+        const codeEl = trigger.previousElementSibling.cloneNode(true);
+        for (const childEl of codeEl.children) {
+          if (isCodeAnnotation(childEl)) {
+            childEl.remove();
+          }
+        }
+        return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dbikard\.github\.io\/randseq");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

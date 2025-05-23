@@ -4,7 +4,8 @@
 
 # %% auto 0
 __all__ = ['get_lib_seq_context', 'get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends', 'filter_to_core_motifs',
-           'plot_analysis_results', 'get_fold_change_values_per_site', 'get_sites_scores', 'find_restricted_sites']
+           'get_fold_change_values_per_site', 'filter_sequences_without_core_motifs', 'get_sites_scores',
+           'filter_to_core_flexible_motifs', 'plot_flexible_motif_analysis']
 
 # %% ../nbs/00_core.ipynb 3
 import pandas as pd
@@ -22,6 +23,7 @@ from itertools import groupby, chain
 from operator import itemgetter
 import os
 from .utils import revcomp, calculate_log2fc, allseqs, get_all_sites, flatten    
+import ast
 
 # %% ../nbs/00_core.ipynb 9
 def get_lib_seq_context(seqs,left,right):
@@ -81,7 +83,12 @@ def score(FCs, thr=-1):
     return sum([x < thr for x in FCs]) / len(FCs)
 
 # %% ../nbs/00_core.ipynb 16
-def identify_depleted_motifs_scanning_ends(log2fc_series, scan_depth_k=6, max_motif_length=6, depletion_threshold=-1, score_thr=0.8, min_sequence_support=5):
+def identify_depleted_motifs_scanning_ends(log2fc_series, 
+                                           scan_depth_k=6, 
+                                           max_motif_length=6, 
+                                           depletion_threshold=-1, 
+                                           score_thr=0.85, 
+                                           min_sequence_support=5):
     """
     Identifies DNA motifs associated with sequence depletion by scanning k positions
     from both the left and right ends of sequences, using a pandas Series of log2FC values.
@@ -212,7 +219,6 @@ def filter_to_core_motifs(depleted_motifs_df,
         candidate_pos = candidate_row['position']
         candidate_len = candidate_row['length']
         candidate_score = candidate_row['fraction_depleted']
-        candidate_avg_fc = candidate_row['avg_log2fc']
         
         is_subsumed = False
         for core_dict in core_motifs_list: 
@@ -220,7 +226,6 @@ def filter_to_core_motifs(depleted_motifs_df,
             core_pos = core_dict['position']
             core_len = core_dict['length']
             core_score = core_dict['fraction_depleted']
-            core_avg_fc = core_dict['avg_log2fc']
             
             if core_len < candidate_len and core_motif in candidate_motif:    
                 relative_start = candidate_motif.find(core_motif)
@@ -241,195 +246,6 @@ def filter_to_core_motifs(depleted_motifs_df,
 
 
 # %% ../nbs/00_core.ipynb 20
-def plot_analysis_results(counts_df, sample_col, ref_col, log2fc_series_for_dist, core_motifs_df, 
-                               title_scatter="Normalized Sequence Counts Comparison (Log Scale)", 
-                               title_dist="Log2FC Distribution", pseudocount=1):
-    """
-    Generates two plots:
-    1. Scatter plot of normalized sample vs reference counts (log scale),
-       highlighting sequences containing core motifs with distinct colors.
-    2. Histogram of log2FC values, with an overlay for sequences containing specific core motifs.
-
-    Args:
-        counts_df (pd.DataFrame): DataFrame with sequences as index and count columns.
-        sample_col (str): Name of the column for sample counts (y-axis).
-        ref_col (str): Name of the column for reference counts (x-axis).
-        log2fc_series_for_dist (pd.Series): Series with sequences as index and log2FC values
-                                            for the distribution plot.
-        core_motifs_df (pd.DataFrame): DataFrame of core motifs, must include
-                                       'motif', 'position', and 'length' columns.
-        title_scatter (str): The title for the scatter plot.
-        title_dist (str): The title for the log2FC distribution plot.
-        pseudocount (int/float): Value to add to counts before log transformation for scatter.
-    """
-    # --- Scatter Plot of Normalized Counts ---
-    if not isinstance(counts_df, pd.DataFrame) or counts_df.empty:
-        print("Plotting error: counts_df is invalid or empty for scatter plot.")
-        return
-    if sample_col not in counts_df.columns or ref_col not in counts_df.columns:
-        print(f"Plotting error: One or both count columns ('{sample_col}', '{ref_col}') not in counts_df.")
-        return
-
-    expected_core_motif_cols = ['motif', 'position', 'length']
-    if core_motifs_df is None:
-        core_motifs_df = pd.DataFrame(columns=expected_core_motif_cols)
-    elif not isinstance(core_motifs_df, pd.DataFrame):
-        print("Plotting warning: core_motifs_df was not a DataFrame. No motif highlights will be applied.")
-        core_motifs_df = pd.DataFrame(columns=expected_core_motif_cols)
-    elif not core_motifs_df.empty and not all(col in core_motifs_df.columns for col in expected_core_motif_cols):
-        print(f"Plotting warning: core_motifs_df is missing one or more required columns ({', '.join(expected_core_motif_cols)}). No motif highlights will be applied.")
-        core_motifs_df = pd.DataFrame(columns=expected_core_motif_cols)
-
-    sample_counts_numeric = pd.to_numeric(counts_df[sample_col], errors='coerce')
-    ref_counts_numeric = pd.to_numeric(counts_df[ref_col], errors='coerce')
-    total_sample_counts = sample_counts_numeric.sum()
-    total_ref_counts = ref_counts_numeric.sum()
-
-    if total_sample_counts == 0 or total_ref_counts == 0:
-        print("Plotting warning: Total counts for sample or reference are zero. Using raw counts + pseudocount for scatter plot.")
-        x_data_norm = ref_counts_numeric.fillna(0).values + pseudocount
-        y_data_norm = sample_counts_numeric.fillna(0).values + pseudocount
-        norm_label_suffix = f"(Counts + {pseudocount}, log scale) - Normalization to CPM failed"
-    else:
-        x_data_norm = (ref_counts_numeric / total_ref_counts * 1e6).fillna(0).values + pseudocount
-        y_data_norm = (sample_counts_numeric / total_sample_counts * 1e6).fillna(0).values + pseudocount
-        norm_label_suffix = f"(CPM + {pseudocount}, log scale)"
-
-    default_color = 'grey' 
-    motif_color_map = {}
-    if not core_motifs_df.empty and 'motif' in core_motifs_df.columns:
-        unique_motif_strings = core_motifs_df['motif'].unique()
-        if len(unique_motif_strings) > 0:
-            cmap = plt.cm.get_cmap('tab10') 
-            motif_color_map = {
-                motif_str: cmap(i % cmap.N) 
-                for i, motif_str in enumerate(unique_motif_strings)
-            }
-
-    point_assigned_motif_str_scatter = [None] * len(counts_df)
-    if not core_motifs_df.empty and all(col in core_motifs_df.columns for col in expected_core_motif_cols):
-        for i, seq_str in enumerate(counts_df.index):
-            if not isinstance(seq_str, str): continue
-            for _, motif_row in core_motifs_df.iterrows():
-                current_motif_str = motif_row['motif']
-                try:
-                    position = int(motif_row['position']); motif_len = int(motif_row['length'])   
-                except (ValueError, TypeError): continue
-                if current_motif_str in motif_color_map:
-                    if len(seq_str) >= position + motif_len:
-                        if seq_str[position : position + motif_len] == current_motif_str:
-                            point_assigned_motif_str_scatter[i] = current_motif_str
-                            break 
-    
-    plt.figure(figsize=(12, 8))
-    other_x_scatter = [x_data_norm[i] for i, m_str in enumerate(point_assigned_motif_str_scatter) if m_str is None and pd.notna(x_data_norm[i]) and pd.notna(y_data_norm[i])]
-    other_y_scatter = [y_data_norm[i] for i, m_str in enumerate(point_assigned_motif_str_scatter) if m_str is None and pd.notna(x_data_norm[i]) and pd.notna(y_data_norm[i])]
-    if other_x_scatter:
-        plt.scatter(other_x_scatter, other_y_scatter, color=default_color, alpha=0.5, s=20, label='Other sequences')
-
-    plotted_motifs_legend_scatter = False
-    if motif_color_map:
-        for motif_to_plot, color_for_motif in motif_color_map.items():
-            motif_x = [x_data_norm[i] for i, m_str in enumerate(point_assigned_motif_str_scatter) if m_str == motif_to_plot and pd.notna(x_data_norm[i]) and pd.notna(y_data_norm[i])]
-            motif_y = [y_data_norm[i] for i, m_str in enumerate(point_assigned_motif_str_scatter) if m_str == motif_to_plot and pd.notna(x_data_norm[i]) and pd.notna(y_data_norm[i])]
-            if motif_x:
-                plt.scatter(motif_x, motif_y, color=color_for_motif, alpha=0.7, s=30, label=f'Motif: {motif_to_plot}')
-                plotted_motifs_legend_scatter = True
-        
-    plt.xscale('log'); plt.yscale('log')
-    plt.xlabel(f"{ref_col} {norm_label_suffix}")
-    plt.ylabel(f"{sample_col} {norm_label_suffix}")
-    plt.title(depleted_motifs_df)
-    
-    valid_x_for_line_norm = x_data_norm[(x_data_norm > 0) & np.isfinite(x_data_norm)]
-    valid_y_for_line_norm = y_data_norm[(y_data_norm > 0) & np.isfinite(y_data_norm)]
-    if len(valid_x_for_line_norm) > 0 and len(valid_y_for_line_norm) > 0:
-        min_val_norm = min(np.min(valid_x_for_line_norm), np.min(valid_y_for_line_norm))
-        max_val_norm = max(np.max(valid_x_for_line_norm), np.max(valid_y_for_line_norm))
-        if min_val_norm < max_val_norm : 
-             plt.plot([min_val_norm, max_val_norm], [min_val_norm, max_val_norm], 'k--', alpha=0.7, label='y=x (No change)')
-    
-    handles_scatter, labels_scatter = plt.gca().get_legend_handles_labels()
-    if handles_scatter:
-        by_label_scatter = dict(zip(labels_scatter, handles_scatter))
-        plt.legend(by_label_scatter.values(), by_label_scatter.keys())
-    elif not plotted_motifs_legend_scatter and other_x_scatter:
-         print("Plotting info (Scatter): No sequences with core motifs found/plotted to highlight.")
-    elif not other_x_scatter and not plotted_motifs_legend_scatter:
-         print("Plotting error (Scatter): No valid data points to plot.")
-    plt.grid(True, linestyle=':', alpha=0.7); plt.tight_layout(); plt.show()
-
-    # --- Log2FC Distribution Plot ---
-    if not isinstance(log2fc_series_for_dist, pd.Series) or log2fc_series_for_dist.empty:
-        print("Plotting error: log2fc_series_for_dist is invalid or empty for distribution plot.")
-        return 
-    
-    all_log2fc_values = pd.to_numeric(log2fc_series_for_dist, errors='coerce').dropna().values
-
-    plt.figure(figsize=(10, 6))
-    if len(all_log2fc_values) > 0:
-        # Plot all sequences distribution first
-        plt.hist(all_log2fc_values, bins=50, alpha=0.5, label='All sequences', color='lightgrey', density=True)
-    else:
-        print("Log2FC Distribution: No data for 'All sequences'.")
-
-    # Plot distributions for each core motif
-    plotted_motif_dist = False
-    if not core_motifs_df.empty and all(col in core_motifs_df.columns for col in expected_core_motif_cols) and motif_color_map:
-        # Iterate through unique motifs found in the core_motifs_df, using the motif_color_map
-        for motif_to_plot, color_for_motif in motif_color_map.items():
-            # Find all rows in core_motifs_df that match this motif_to_plot
-            # A motif string can appear at different positions/lengths but we group by motif string here
-            
-            log2fc_for_this_motif_list = []
-            # Get all sequences that contain this specific motif_to_plot (considering its position and length from core_motifs_df)
-            # This requires iterating through core_motifs_df and then through sequences for each matching motif entry.
-            
-            # A more direct way: find all sequences containing this motif string at ANY of its core-identified positions
-            sequences_containing_this_motif_str_mask = pd.Series(False, index=log2fc_series_for_dist.index)
-            
-            # Get all (position, length) pairs for the current motif_to_plot from core_motifs_df
-            motif_instances = core_motifs_df[core_motifs_df['motif'] == motif_to_plot]
-
-            for seq_idx, seq_str_from_log2fc in enumerate(log2fc_series_for_dist.index):
-                if not isinstance(seq_str_from_log2fc, str): continue
-                found_this_motif_in_seq = False
-                for _, motif_instance_row in motif_instances.iterrows():
-                    try:
-                        pos = int(motif_instance_row['position'])
-                        mlen = int(motif_instance_row['length'])
-                    except (ValueError, TypeError): continue
-
-                    if len(seq_str_from_log2fc) >= pos + mlen:
-                        if seq_str_from_log2fc[pos : pos + mlen] == motif_to_plot:
-                            sequences_containing_this_motif_str_mask.iloc[seq_idx] = True
-                            found_this_motif_in_seq = True
-                            break # Found this motif string in this sequence
-                # if found_this_motif_in_seq: # not needed, mask handles it
-                #    pass
-            
-            log2fc_values_for_this_motif = pd.to_numeric(log2fc_series_for_dist[sequences_containing_this_motif_str_mask], errors='coerce').dropna().values
-            
-            if len(log2fc_values_for_this_motif) > 0:
-                plt.hist(log2fc_values_for_this_motif, bins=50, alpha=0.6, label=f'Motif: {motif_to_plot}', color=color_for_motif, density=True)
-                plotted_motif_dist = True
-    
-    if not plotted_motif_dist and len(all_log2fc_values) > 0 : # if only 'all sequences' was plotted
-        print("Log2FC Distribution: No specific core motifs to plot or no sequences found for them.")
-    elif not plotted_motif_dist and len(all_log2fc_values) == 0:
-         print("Log2FC Distribution: No data to plot.")
-
-
-    plt.xlabel("Log2 Fold Change (log2FC)")
-    plt.ylabel("Density")
-    plt.title(title_dist)
-    if len(all_log2fc_values) > 0 or plotted_motif_dist: # Show legend if there's data
-        plt.legend()
-    plt.grid(True, linestyle=':', alpha=0.6)
-    plt.tight_layout()
-    plt.show()
-
-# %% ../nbs/00_core.ipynb 23
 def get_fold_change_values_per_site(site_sets_list, fold_changes_list):
     """
     Computes a dictionary mapping each unique site to a list of its associated
@@ -468,33 +284,228 @@ def get_fold_change_values_per_site(site_sets_list, fold_changes_list):
     return site_to_fcs_map
 
 
-# %% ../nbs/00_core.ipynb 25
+# %% ../nbs/00_core.ipynb 22
+def filter_sequences_without_core_motifs(log2fc_series, core_motifs_df):
+    """
+    Filters an original log2fc Series to remove sequences that contain 
+    any of the specified core motifs.
+
+    Args:
+        log2fc_series (pd.Series): Series with sequences as its index and log2FC values.
+        core_motifs_df (pd.DataFrame): DataFrame of core motifs, must include
+                                       'motif', 'position', and 'length' columns.
+
+    Returns:
+        pd.Series: A new Series containing only sequences (and their log2FC values)
+                   from log2fc_series that do not carry any of the core motifs.
+    """
+    if not isinstance(log2fc_series, pd.Series) or log2fc_series.empty:
+        # print("Info: log2fc_series is empty or not a Series. Returning a copy.")
+        return log2fc_series.copy() 
+    
+    expected_core_motif_cols = ['motif', 'position', 'length']
+    if not isinstance(core_motifs_df, pd.DataFrame) or core_motifs_df.empty or \
+       not all(col in core_motifs_df.columns for col in expected_core_motif_cols):
+        print("Info: core_motifs_df is empty or invalid for filtering. Returning original log2fc_series.")
+        return log2fc_series.copy()
+
+    # Create a boolean mask, True for sequences to keep
+    sequences_to_keep_mask = pd.Series(True, index=log2fc_series.index)
+
+    # Iterate through each unique sequence string in the original Series' index
+    # Using .loc for assignment to the mask handles duplicate indices in the original Series correctly
+    for seq_str_to_check in log2fc_series.index.unique(): 
+        if not isinstance(seq_str_to_check, str): 
+            continue # Skip if index label is not a string
+        
+        # Check this sequence against all core motifs
+        for _, motif_row in core_motifs_df.iterrows():
+            motif_str = motif_row['motif']
+            try:
+                position = int(motif_row['position'])
+                motif_len = int(motif_row['length'])
+            except (ValueError, TypeError):
+                # print(f"Warning: Invalid position/length for motif {motif_str} in core_motifs_df. Skipping this motif.")
+                continue 
+
+            if not isinstance(motif_str, str) or not motif_str: 
+                continue
+
+            if len(seq_str_to_check) >= position + motif_len:
+                if seq_str_to_check[position : position + motif_len] == motif_str:
+                    # If a motif is found, mark all occurrences of this sequence string for removal
+                    sequences_to_keep_mask.loc[log2fc_series.index == seq_str_to_check] = False 
+                    break # Move to the next unique sequence_str_to_check
+
+    return log2fc_series[sequences_to_keep_mask]
+
+# %% ../nbs/00_core.ipynb 24
 def get_sites_scores(site_FCs, pattern, log2FC_thr=-1):
-    allsites=get_all_sites(pattern)
-    site_scores=dict([(s,(0,0)) for s in allsites])
-    sites_with_no_data=[]
-    for site in allsites:
-        if site in site_FCs:
-            site_scores[site]=(score(site_FCs[site], log2FC_thr), len(site_FCs[site]))
-        else:
-            sites_with_no_data.append(site)
-    return site_scores
+    """ 
+    Scores sites based on depletion and occurrence.
+    Returns a pandas DataFrame with 'site', 'fraction_depleted', 'num_sequences', 'avg_log2fc'.
+    """
+    site_scores_list = []
+    
+    for site_key, fc_values in site_FCs.items():
+        if not isinstance(fc_values, (list, np.ndarray)) or len(fc_values) == 0:
+            continue # Skip if fc_values is not a list/array or is empty
+            
+        current_score = score(fc_values, log2FC_thr)
+        num_occurrences = len(fc_values)
+        avg_fc = np.mean(fc_values) if num_occurrences > 0 else np.nan
+        
+        site_scores_list.append({
+            'motif': site_key,
+            'fraction_depleted': current_score,
+            'num_sequences': num_occurrences,
+            'avg_log2fc': avg_fc
+        })
+            
+    if not site_scores_list:
+        return pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
+    return pd.DataFrame(site_scores_list)
 
-# %% ../nbs/00_core.ipynb 27
-def find_restricted_sites(FCs, left, right, patterns=[(6,0,0),(3,6,4)], log2FC_thr=-1, fraction_thr=0.8, min_count=5):
-  
-    lib = get_lib_seq_context(FCs.index, left, right)
-    restricted_sites={}
-    for pattern in patterns:
-        print("Looking for sites following pattern: ", pattern)
-        sites_in_seq=get_sites_in_seq(lib,pattern=pattern,no_ori=True)
-        site_FCs=get_fold_change_values_per_site(sites_in_seq, FCs)
-        site_scores = get_sites_scores(site_FCs, pattern, log2FC_thr=log2FC_thr)
-        restricted_sites.update(dict([(site,site_scores[site]) for site in site_scores 
-                         if (site_scores[site][0]>fraction_thr)
-                         and site_scores[site][1]>min_count])) 
+# %% ../nbs/00_core.ipynb 26
+def filter_to_core_flexible_motifs(flexible_motifs_df, score_margin=0.05):
+    """
+    Filters a DataFrame of flexible (position-independent) motifs to identify underlying "core" motifs.
+    A longer/more complex motif is removed if its score is not significantly better than a simpler
+    core motif pattern it contains.
 
-        sites_with_not_enough_data = [site for site, (score, n) in site_scores.items() if n<min_count]
-        print(f"Not enough data for {len(sites_with_not_enough_data)} sites with {pattern} pattern")
+    Args:
+        flexible_motifs_df (pd.DataFrame): DataFrame with 'site', 'pattern' (string like '(3,4,4)'),
+                                           'fraction_depleted', 'num_sequences', 'avg_log2fc'.
+        score_margin (float): A more complex motif is subsumed if its 'fraction_depleted'
+                              is not better than (core_score - score_margin).
+                              Effectively, if candidate_score >= core_score - score_margin, it's subsumed.
 
-    return restricted_sites
+    Returns:
+        pd.DataFrame: A filtered DataFrame containing potentially core flexible motifs.
+    """
+    if not isinstance(flexible_motifs_df, pd.DataFrame) or flexible_motifs_df.empty:
+        return pd.DataFrame(columns=flexible_motifs_df.columns)
+
+    # Ensure required columns exist
+    required_cols = ['motif', 'pattern', 'fraction_depleted', 'avg_log2fc', 'num_sequences']
+    if not all(col in flexible_motifs_df.columns for col in required_cols):
+        print("Warning (filter_to_core_flexible_motifs): DataFrame missing required columns. Returning original.")
+        return flexible_motifs_df.copy()
+
+    # 1. Parse 'pattern' string and add helper columns
+    df = flexible_motifs_df.copy()
+    try:
+        df['pattern_tuple'] = df['pattern'].apply(ast.literal_eval)
+        df['p0'] = df['pattern_tuple'].apply(lambda x: x[0])
+        df['p1_Ns'] = df['pattern_tuple'].apply(lambda x: x[1])
+        df['p2'] = df['pattern_tuple'].apply(lambda x: x[2])
+        df['defined_len'] = df['p0'] + df['p2']
+    except Exception as e:
+        print(f"Error parsing 'pattern' column in filter_to_core_flexible_motifs: {e}. Returning original DataFrame.")
+
+
+    # 2. Sort by simplicity then score
+    sorted_df = df.sort_values(
+        by=['p1_Ns', 'defined_len', 'fraction_depleted', 'avg_log2fc', 'num_sequences'],
+        ascending=[True, True, False, True, False]
+    ).reset_index(drop=True)
+
+    core_flex_list = []
+    for _, candidate_row in sorted_df.iterrows():
+        cand_site = candidate_row['motif']
+        cand_p0, cand_p1_Ns, cand_p2 = candidate_row['p0'], candidate_row['p1_Ns'], candidate_row['p2']
+        cand_score = candidate_row['fraction_depleted']
+        # cand_avgfc = candidate_row['avg_log2fc'] # Not used in this subsumption logic for now
+
+        is_subsumed = False
+        for core_dict in core_flex_list: # Compare with already accepted core motifs
+            core_site = core_dict['motif']
+            core_p0, core_p1_Ns, core_p2 = core_dict['p0'], core_dict['p1_Ns'], core_dict['p2']
+            core_score = core_dict['fraction_depleted']
+            # core_avgfc = core_dict['avg_log2fc']
+
+            # Simplicity check: core must be simpler than candidate
+            is_simpler = (core_p0 + core_p2 <= cand_p0 + cand_p2) 
+            if is_simpler:
+                # Containment check: Does candidate_site contain the core_site pattern?
+                # Convert core_site to a regex where Ns are wildcards
+                core_site_part1 = core_site[0:core_p0]
+                core_site_part2 = core_site[core_p0 + core_p1_Ns : core_p0 + core_p1_Ns + core_p2]
+                
+                core_regex_parts = []
+                if core_p0 > 0: core_regex_parts.append(re.escape(core_site_part1))
+                if core_p1_Ns > 0: core_regex_parts.append(f"[ATGCN]{{{core_p1_Ns}}}") # Match any base for Ns
+                if core_p2 > 0: core_regex_parts.append(re.escape(core_site_part2))
+                core_regex = "".join(core_regex_parts)
+                if core_regex: # Ensure regex is not empty
+                    try:
+                        if re.search(core_regex, cand_site):
+                            is_subsumed = True
+                            break 
+                        if re.search(core_regex, revcomp(cand_site)):
+                            is_subsumed = True
+                            break
+
+                    except re.error:
+                        # print(f"Regex error for core pattern: {core_regex}")
+                        continue # Skip this core if its regex is bad
+                
+        
+        if not is_subsumed:
+            # Add original columns, not the temporary ones, to the list
+            core_flex_list.append(candidate_row.to_dict())
+
+    if not core_flex_list:
+        return pd.DataFrame(columns=flexible_motifs_df.columns)
+    
+    return pd.DataFrame(core_flex_list)[flexible_motifs_df.columns]
+
+# %% ../nbs/00_core.ipynb 34
+def plot_flexible_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df, 
+                                   left_context_str, right_context_str, 
+                                   title_main="Flexible Motif Analysis", pseudocount=1):
+    """
+    Generates two subplots for FLEXIBLE (position-independent) motifs, considering sequence context.
+    Uses get_flexible_motif_presence_in_library to simplify highlighting.
+    """
+    motif_presence_df = get_flexible_motif_presence_in_library(
+            counts_df.index.tolist(), left_context_str, right_context_str, flexible_motifs_df
+        )
+
+    # --- Minimal defaulting for flexible_motifs_df to prevent immediate errors ---
+    # If it's not a valid DataFrame with 'motif' and 'pattern', treat as no motifs.
+    if not (isinstance(flexible_motifs_df, pd.DataFrame) and \
+            'motif' in flexible_motifs_df.columns and \
+            'pattern' in flexible_motifs_df.columns): # pattern needed for dummy
+        flexible_motifs_df = pd.DataFrame(columns=['motif', 'pattern'])
+    # Note: Other inputs (counts_df, sample_col, etc.) are now assumed to be valid by the caller.
+
+    # --- Data Preparation ---
+    plot_df = counts_df.copy()
+    plot_df['sample_numeric'] = pd.to_numeric(plot_df[sample_col], errors='coerce')
+    plot_df['ref_numeric'] = pd.to_numeric(plot_df[ref_col], errors='coerce')
+
+    total_sample = plot_df['sample_numeric'].sum()
+    total_ref = plot_df['ref_numeric'].sum()
+
+    if total_sample == 0 or total_ref == 0:
+        plot_df['y_plot_values'] = plot_df['sample_numeric'].fillna(0) + pseudocount
+        plot_df['x_plot_values'] = plot_df['ref_numeric'].fillna(0) + pseudocount
+        norm_label_suffix = f"(Counts + {pseudocount}, log scale) - Norm. Failed"
+    else:
+        plot_df['y_plot_values'] = (plot_df['sample_numeric'] / total_sample * 1e6).fillna(0) + pseudocount
+        plot_df['x_plot_values'] = (plot_df['ref_numeric'] / total_ref * 1e6).fillna(0) + pseudocount
+        norm_label_suffix = f"(CPM + {pseudocount}, log scale)"
+
+    # --- Plotting Setup ---
+    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+    fig.suptitle(title_main, fontsize=16)
+    ax_scatter_flex = axes
+    ax_scatter_flex.scatter(plot_df['x_plot_values'], plot_df['y_plot_values'], color='grey', alpha=0.5, s=10, label='All Sequences')
+    for _ , motif in flexible_motifs_df.iterrows():
+        df_flt=plot_df.loc[motif_presence_df[motif['motif']].values]
+        ax_scatter_flex.scatter(df_flt['x_plot_values'], df_flt['y_plot_values'], alpha=0.5, s=10, label=motif['motif'])
+    ax_scatter_flex.loglog()
+    ax_scatter_flex.legend()
+    plt.show()
+

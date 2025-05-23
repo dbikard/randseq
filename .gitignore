@@ -22,6 +22,9 @@ __pycache__/
 # C extensions
 *.so
 
+# Dev
+old_nbs/
+
 # Distribution / packaging
 .Python
 env/

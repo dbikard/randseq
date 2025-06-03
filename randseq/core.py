@@ -24,36 +24,146 @@ from operator import itemgetter
 import os
 from .utils import revcomp, calculate_log2fc, allseqs, get_all_sites, flatten, get_lib_seq_context
 import ast
-
-# %% ../nbs/00_core.ipynb 9
-def get_sites_in_seq(lib,pattern=(3,6,4),no_ori=True):
-    '''Computes the list of unique sites matching the pattern present in each sequence of the library
-    The pattern is a list of 3 number:
-        1. The number of defined bases in the first part of the site
-        2. The number of undefined bases in the middle
-        3. The number of defined bases in the second part of the site
-    '''
-    #Checks all sequences are the same size
-    if len(set([len(s) for s in lib]))!=1:
-        return 'not all sequences in library are the same size'
-    
-    L=len(lib[0])
-    
-    if len(pattern)>L:
-        return 'site specifications are longer than the sequence provided'
-    
-    
-    set_list=[]
-    for seq in lib:
-        sites=re.findall("(?=([ATGC]{{{}}})([ATGC]{{{}}})([ATGC]{{{}}}))".format(pattern[0],pattern[1],pattern[2]),seq)
-        if no_ori==True:
-            rev=revcomp(seq)
-            sites+=re.findall("(?=([ATGC]{{{}}})([ATGC]{{{}}})([ATGC]{{{}}}))".format(pattern[0],pattern[1],pattern[2]),rev)
-        set_list.append(set([s1+'N'*pattern[1]+s3 for s1,s2,s3 in sites]))
-
-    return set_list
+from typing import List, Tuple, Set, Callable
 
 # %% ../nbs/00_core.ipynb 11
+# Helper function to create regex group strings for the main function
+def _make_regex_group_str(length: int, content_char_class: str = "[ATGC]") -> str:
+    """
+    Creates a regex capturing group string.
+    If length is 0, creates an empty capturing group "()".
+    Otherwise, creates a group like "([ATGC]{length})".
+    """
+    if length > 0:
+        return f"({content_char_class}{{{length}}})"
+    else: # length == 0
+        return "()" # Captures an empty string
+
+def get_sites_in_seq(
+    sequence_library: List[str],
+    pattern: Tuple[int, int, int] = (3, 6, 4),
+    no_ori: bool = True,
+    custom_revcomp: Callable[[str], str] = revcomp
+) -> List[Set[str]]:
+    """
+    Computes the list of unique sites matching a defined pattern within each sequence
+    of a given library.
+
+    The pattern specifies a motif structure: (defined_bases_part1, spacer_length, defined_bases_part2).
+    For example, a pattern (3, 6, 4) looks for sites like XXXNNNNNNXXXX, where X
+    represents a defined base (A, T, G, C) and N represents an undefined base in the motif.
+
+    Args:
+        sequence_library: A list of DNA sequence strings. All sequences are expected
+                          to be of the same length.
+        pattern: A tuple of three non-negative integers:
+            1. The number of defined bases in the first part of the site.
+            2. The length of the spacer (undefined bases) in the middle.
+            3. The number of defined bases in the second part of the site.
+        no_ori: If True (default), the search for sites is performed on both the
+                provided sequence and its reverse complement. If False, only the
+                provided sequence strand is searched.
+        custom_revcomp: A function to compute the reverse complement. Defaults to
+                        a basic internal `revcomp` function.
+
+    Returns:
+        A list of sets. Each set contains unique site strings found in the
+        corresponding input sequence. Sites are represented with 'N' for the
+        spacer region (e.g., "ATCNNNNGGC").
+
+    Raises:
+        ValueError: If the sequence library is empty.
+        ValueError: If sequences in the library are not all of the same length.
+        ValueError: If the pattern is not a tuple of three non-negative integers.
+        ValueError: If the total length of the site defined by the pattern is zero.
+        ValueError: If the total length of the site pattern exceeds the length of the
+                    sequences in the library.
+    """
+    # --- Input Validation ---
+    if not sequence_library:
+        raise ValueError("Sequence library cannot be empty.")
+
+    try:
+        first_seq_len = len(sequence_library[0])
+    except IndexError: # Should be caught by the above, but for safety
+        raise ValueError("Sequence library cannot be empty.")
+
+    if not all(len(s) == first_seq_len for s in sequence_library):
+        raise ValueError("Not all sequences in the library have the same length.")
+    sequence_length = first_seq_len
+
+    if not (
+        isinstance(pattern, tuple) and
+        len(pattern) == 3 and
+        all(isinstance(p_num, int) and p_num >= 0 for p_num in pattern)
+    ):
+        raise ValueError(
+            "Pattern must be a tuple of three non-negative integers: "
+            "(defined_bases_part1, spacer_length, defined_bases_part2)."
+        )
+
+    defined_len1, spacer_len, defined_len2 = pattern
+    pattern_total_length = defined_len1 + spacer_len + defined_len2
+
+    if pattern_total_length == 0:
+        # Finding motifs of total length 0 (e.g., pattern (0,0,0)) is problematic
+        # as it would match everywhere. It's better to disallow it.
+        raise ValueError("The total length of the site pattern (sum of its parts) cannot be zero.")
+
+    if pattern_total_length > sequence_length:
+        raise ValueError(
+            f"Site pattern's total length ({pattern_total_length}) is longer than "
+            f"the sequence length ({sequence_length})."
+        )
+
+    # --- Regex Preparation ---
+    # Uses the helper _make_regex_group_str to create "()" for zero-length parts.
+    # This ensures three capturing groups are always present for consistent unpacking later.
+    group1_str = _make_regex_group_str(defined_len1)
+    # The spacer part in the original regex also used [ATGC] for the characters
+    # it matched in the sequence, even though these are replaced by 'N's in the motif.
+    group2_str = _make_regex_group_str(spacer_len) 
+    group3_str = _make_regex_group_str(defined_len2)
+    
+    # The lookahead `(?=...)` is crucial for finding all overlapping sites.
+    regex_pattern_str = f"(?={group1_str}{group2_str}{group3_str})"
+    
+    # Using re.IGNORECASE for robustness, assuming 'atgc' is equivalent to 'ATGC'.
+    compiled_regex = re.compile(regex_pattern_str, re.IGNORECASE)
+
+    # --- Site Finding ---
+    all_sequence_results: List[Set[str]] = []
+    
+    for seq_original_case in sequence_library:
+        current_sequence_sites: Set[str] = set()
+        
+        # Standardize sequence to uppercase for consistent processing and regex matching
+        processed_seq = seq_original_case.upper()
+
+        sequences_to_scan = [processed_seq]
+        if no_ori:
+            # Ensure the revcomp function also standardizes or expects uppercase
+            reverse_complement_seq = custom_revcomp(processed_seq)
+            sequences_to_scan.append(reverse_complement_seq)
+
+        for target_sequence in sequences_to_scan:
+            # Find all matches in the current target sequence (forward or reverse complement)
+            # matches will be a list of 3-tuples due to the three capturing groups.
+            matches = compiled_regex.findall(target_sequence)
+            for part1, actual_spacer_bases, part2 in matches: # Unpack the 3 captured groups
+                # Construct the site motif string using 'N's for the spacer region.
+                # The `actual_spacer_bases` captured by the regex are intentionally
+                # ignored here for the motif string, which uses a generic 'N' spacer.
+                # If spacer_len is 0, 'N' * 0 is an empty string.
+                site_motif = f"{part1}{'N' * spacer_len}{part2}"
+                current_sequence_sites.add(site_motif)
+        
+        all_sequence_results.append(current_sequence_sites)
+
+    return all_sequence_results
+
+
+# %% ../nbs/00_core.ipynb 14
 def score(FCs, thr=-1):
     """
     Returns the fraction of sequences depleted below the thr value.
@@ -63,7 +173,7 @@ def score(FCs, thr=-1):
         return 0.0
     return sum([x < thr for x in FCs]) / len(FCs)
 
-# %% ../nbs/00_core.ipynb 13
+# %% ../nbs/00_core.ipynb 16
 def identify_depleted_motifs_scanning_ends(log2fc_series, 
                                            scan_depth_k=6, 
                                            max_motif_length=6, 
@@ -168,7 +278,7 @@ def identify_depleted_motifs_scanning_ends(log2fc_series,
     results_df = results_df.loc[results_df['fraction_depleted'] > score_thr]
     return results_df
 
-# %% ../nbs/00_core.ipynb 15
+# %% ../nbs/00_core.ipynb 18
 def filter_to_core_motifs(depleted_motifs_df, 
                           score_improvement_margin=0.05):
     """
@@ -226,14 +336,15 @@ def filter_to_core_motifs(depleted_motifs_df,
 
 
 
-# %% ../nbs/00_core.ipynb 17
+# %% ../nbs/00_core.ipynb 22
 def get_fold_change_values_per_site(site_sets_list, fold_changes_list):
     """
     Computes a dictionary mapping each unique site to a list of its associated
-    log2 Fold Change (FC) values.
+    log2 Fold Change (FC) values using collections.defaultdict for optimization.
 
     Args:
-        site_sets_list (list): A list of sets, where each set contains the sequence motifs found in a member of the library.
+        site_sets_list (list): A list of sets, where each set contains the 
+                               sequence motifs found in a member of the library.
         fold_changes_list (list): A list of log2FC values, corresponding to each
                                   sequence in the library.
 
@@ -241,31 +352,29 @@ def get_fold_change_values_per_site(site_sets_list, fold_changes_list):
         dict: A dictionary where keys are sequence motifs and values are numpy arrays
               containing the log2FC values associated with that site.
     """
+    # Step 1: Initialize a defaultdict to store lists of FC values for each site.
+    # defaultdict(list) will automatically create a new list for a site
+    # the first time it's encountered.
+    site_to_fcs_map_intermediate = defaultdict(list)
 
-    # Step 1: Create a flat list of (site, FC_value) pairs
-    # Each site within a set is associated with that set's FC value.
-    site_fc_pairs_nested = [
-     [(site, fc_value) for site in site_set]
-     for site_set, fc_value in zip(site_sets_list, fold_changes_list)
-     ]
-    site_fc_pairs = list(chain.from_iterable(site_fc_pairs_nested)) # Standard way to flatten
+    # Step 2: Iterate through the site sets and their corresponding fold changes.
+    # zip() pairs each site_set with its fc_value.
+    for site_set, fc_value in zip(site_sets_list, fold_changes_list):
+        # For each site in the current set, append the fc_value
+        # to the list associated with that site in the dictionary.
+        for site in site_set:
+            site_to_fcs_map_intermediate[site].append(fc_value)
 
-    # Step 2: Sort the pairs by site to prepare for grouping
-    # Sorting is essential for groupby to work correctly.
-    site_fc_pairs.sort(key=itemgetter(0)) # Sorts by the first element (site)
+    # Step 3: Convert the lists of FC values to NumPy arrays.
+    # This is done after all values are collected to efficiently create the arrays.
+    site_to_fcs_map_final = {
+        site: np.array(fcs_list)
+        for site, fcs_list in site_to_fcs_map_intermediate.items()
+    }
 
-    # Step 3: Group by site and collect FC values
-    site_to_fcs_map = {}
-    for site, group in groupby(site_fc_pairs, key=itemgetter(0)):
-        # group is an iterator of (site, fc_value) tuples for the current site
-        # Extract the FC value (the second element) from each pair in the group
-        fcs_for_site = np.array([fc_value for current_site, fc_value in group])
-        site_to_fcs_map[site] = fcs_for_site
+    return site_to_fcs_map_final
 
-    return site_to_fcs_map
-
-
-# %% ../nbs/00_core.ipynb 19
+# %% ../nbs/00_core.ipynb 24
 def filter_sequences_without_core_motifs(log2fc_series, core_motifs_df):
     """
     Filters an original log2fc Series to remove sequences that contain 
@@ -320,7 +429,7 @@ def filter_sequences_without_core_motifs(log2fc_series, core_motifs_df):
 
     return log2fc_series[sequences_to_keep_mask]
 
-# %% ../nbs/00_core.ipynb 21
+# %% ../nbs/00_core.ipynb 26
 def get_sites_scores(site_FCs, pattern, log2FC_thr=-1):
     """ 
     Scores sites based on depletion and occurrence.
@@ -347,7 +456,7 @@ def get_sites_scores(site_FCs, pattern, log2FC_thr=-1):
         return pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
     return pd.DataFrame(site_scores_list)
 
-# %% ../nbs/00_core.ipynb 23
+# %% ../nbs/00_core.ipynb 28
 def filter_to_core_flexible_motifs(flexible_motifs_df, score_margin=0.05):
     """
     Filters a DataFrame of flexible (position-independent) motifs to identify underlying "core" motifs.
@@ -441,7 +550,7 @@ def filter_to_core_flexible_motifs(flexible_motifs_df, score_margin=0.05):
     
     return pd.DataFrame(core_flex_list)[flexible_motifs_df.columns]
 
-# %% ../nbs/00_core.ipynb 24
+# %% ../nbs/00_core.ipynb 29
 def find_restricted_motifs(log2fc_series, 
                            left_context_str, 
                            right_context_str, 
@@ -474,6 +583,8 @@ def find_restricted_motifs(log2fc_series,
         depleted_fixed_motifs_df,
         score_improvement_margin=core_motif_score_margin
     )
+    del depleted_fixed_motifs_df
+
     if core_fixed_motifs_df.empty:
         print("No core motifs found at fixed positions.")
     else:
@@ -503,6 +614,7 @@ def find_restricted_motifs(log2fc_series,
         right_context_str
     )
     fc_values_for_flexible_analysis = log2fc_series_for_flexible_analysis.tolist()
+    del log2fc_series_for_flexible_analysis
     
     all_flexible_motifs_data_list = [] 
 
@@ -511,7 +623,7 @@ def find_restricted_motifs(log2fc_series,
         flexible_motif_patterns = [flexible_motif_patterns]
     
     for current_flex_pattern in flexible_motif_patterns:
-        # print(f"  Pattern: {current_flex_pattern}") # Reduced verbosity
+        print(f"Looking for pattern: {current_flex_pattern}") 
         site_sets_flexible = get_sites_in_seq(
             sequences_with_context_for_flex, 
             pattern=current_flex_pattern, 
@@ -525,6 +637,8 @@ def find_restricted_motifs(log2fc_series,
             site_sets_flexible,
             fc_values_for_flexible_analysis 
         )
+        del site_sets_flexible # Free memory
+
         current_pattern_scores_df = get_sites_scores( 
             site_fcs_flexible,
             pattern=current_flex_pattern, 

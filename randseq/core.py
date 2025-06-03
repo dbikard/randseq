@@ -25,6 +25,7 @@ import os
 from .utils import revcomp, calculate_log2fc, allseqs, get_all_sites, flatten, get_lib_seq_context
 import ast
 from typing import List, Tuple, Set, Callable
+from random import choice
 
 # %% ../nbs/00_core.ipynb 11
 # Helper function to create regex group strings for the main function
@@ -175,7 +176,7 @@ def score(FCs, thr=-1):
 
 # %% ../nbs/00_core.ipynb 16
 def identify_depleted_motifs_scanning_ends(log2fc_series, 
-                                           scan_depth_k=6, 
+                                           scan_depth_k=7, 
                                            max_motif_length=6, 
                                            depletion_threshold=-1, 
                                            score_thr=0.85, 

@@ -40,7 +40,7 @@ core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1
 ```
 
     --- Starting Fixed-Position Motif Analysis (on original short sequences) ---
-    Analyzing motifs of length 1 to 6, scanning positions 0 to 6 from each end, for JJ1886_T0.
+    Analyzing motifs of length 1 to 4, scanning positions 0 to 6 from each end, for JJ1886_T0.
     Minimum sequence support for a motif: > 5 (i.e., 6 or more)
     Found 2 core motifs at fixed positions:
       - Fixed Motif: GTG, Pos: 0, Len: 3, FracDep: 1.00, AvgFC: -4.76, N: 187
@@ -48,6 +48,11 @@ core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1
 
     --- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---
     Filtered log2fc_series for flexible analysis: 11275 sequences remaining.
+    Looking for pattern: (6, 0, 0)
+    Looking for pattern: (4, 4, 4)
+    Looking for pattern: (3, 4, 4)
+    Looking for pattern: (2, 4, 3)
+    Looking for pattern: (3, 5, 4)
 
     Identified 21 raw flexible motifs. Now filtering to core flexible motifs...
     Found 5 core flexible motifs:
@@ -55,7 +60,7 @@ core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1
       - Flex Motif: AACNNNNCTTT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.33, N: 21
       - Flex Motif: CACNNNNGTAC (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.24, N: 20
       - Flex Motif: CACNNNNGTAT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -4.43, N: 5
-      - Flex Motif: GACCNNNNCCTC (from pattern (4, 4, 4)), FracDep: 1.00, AvgFC: -4.36, N: 4
+      - Flex Motif: GAGGNNNNGGTC (from pattern (4, 4, 4)), FracDep: 1.00, AvgFC: -4.36, N: 4
 
 ``` python
 flexible_motifs_df
@@ -80,13 +85,13 @@ flexible_motifs_df
 | 1   | AACNNNNCTTT  | 1.0               | 21            | -5.325198  | (3, 4, 4) |
 | 2   | CACNNNNGTAC  | 1.0               | 20            | -5.237623  | (3, 4, 4) |
 | 3   | CACNNNNGTAT  | 1.0               | 5             | -4.428066  | (3, 4, 4) |
-| 4   | GACCNNNNCCTC | 1.0               | 4             | -4.357958  | (4, 4, 4) |
+| 4   | GAGGNNNNGGTC | 1.0               | 4             | -4.357958  | (4, 4, 4) |
 
 </div>
 
 ``` python
 from randseq.plotting import plot_motif_analysis
-plot_motif_analysis(counts, "JJ1886_T0", "MFDpir", flexible_motifs_df, left, right)
+fig, axes = plot_motif_analysis(counts, "JJ1886_T0", "MFDpir", flexible_motifs_df, left, right)
 ```
 
 ![](index_files/figure-commonmark/cell-4-output-1.png)

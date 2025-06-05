@@ -7,56 +7,150 @@ __all__ = ['plot_motif_analysis']
 
 # %% ../nbs/02_plotting.ipynb 3
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 from .core import find_restricted_motifs
-from .utils import calculate_log2fc, get_motif_presence_in_library
+from .utils import calculate_log2fc, get_motif_filter_with_context
 
 # %% ../nbs/02_plotting.ipynb 5
-def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df, 
-                                   left_context_str, right_context_str, 
-                                   title_main="Flexible Motif Analysis", pseudocount=1):
+def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
+                        left_context, right_context,
+                        title_main=None, # Changed default to None for auto-generation
+                        pseudocount=1,
+                        log2fc_count_threshold=20, log2fc_pseudocount=1,
+                        figsize=(12, 6), save_filename=None, 
+                        distribution_plot_log_xscale=False):
     """
-    Generates two subplots for position-independent motifs, considering sequence context.
+    Generates two side-by-side subplots with consistent motif colors:
+    1. Scatter plot of normalized counts (sample vs reference).
+    2. Histograms (density) of log2 Fold Change (sample_col / ref_col) for all sequences and each motif.
+    If title_main is None, it's auto-generated from sample_col and ref_col.
     """
-    motif_presence_df = get_motif_presence_in_library(
-            counts_df.index.tolist(), left_context_str, right_context_str, flexible_motifs_df
-        )
 
-    # --- Minimal defaulting for flexible_motifs_df to prevent immediate errors ---
-    # If it's not a valid DataFrame with 'motif' and 'pattern', treat as no motifs.
-    if not (isinstance(flexible_motifs_df, pd.DataFrame) and \
-            'motif' in flexible_motifs_df.columns and \
-            'pattern' in flexible_motifs_df.columns): # pattern needed for dummy
-        flexible_motifs_df = pd.DataFrame(columns=['motif', 'pattern'])
-    # Note: Other inputs (counts_df, sample_col, etc.) are now assumed to be valid by the caller.
+    if not isinstance(counts_df, pd.DataFrame) or counts_df.empty: return None, None
+    if not all(col in counts_df.columns for col in [sample_col, ref_col]): return None, None
+    
+    if flexible_motifs_df is None: flexible_motifs_df = pd.DataFrame(columns=['motif'])
+    elif not isinstance(flexible_motifs_df, pd.DataFrame): return None, None
+    if not flexible_motifs_df.empty and 'motif' not in flexible_motifs_df.columns:
+        flexible_motifs_df = pd.DataFrame(columns=['motif'])
 
-    # --- Data Preparation ---
-    plot_df = counts_df.copy()
-    plot_df['sample_numeric'] = pd.to_numeric(plot_df[sample_col], errors='coerce')
-    plot_df['ref_numeric'] = pd.to_numeric(plot_df[ref_col], errors='coerce')
+    # Auto-generate title_main if it's None
+    if title_main is None:
+        title_main = f"Motif Analysis: {sample_col} vs {ref_col}"
 
-    total_sample = plot_df['sample_numeric'].sum()
-    total_ref = plot_df['ref_numeric'].sum()
+    # --- Define Color Palette ---
+    unique_plot_motifs = []
+    if 'motif' in flexible_motifs_df.columns and not flexible_motifs_df.empty:
+        unique_plot_motifs = flexible_motifs_df['motif'].dropna().unique().tolist()
 
-    if total_sample == 0 or total_ref == 0:
-        plot_df['y_plot_values'] = plot_df['sample_numeric'].fillna(0) + pseudocount
-        plot_df['x_plot_values'] = plot_df['ref_numeric'].fillna(0) + pseudocount
-        norm_label_suffix = f"(Counts + {pseudocount}, log scale) - Norm. Failed"
+    color_map = {'All Sequences': 'grey'} 
+    palette_name = "tab10" 
+    if len(unique_plot_motifs) > 10:
+        palette_name = "tab20" 
+        if len(unique_plot_motifs) > 20:
+            print(f"Warning: Number of unique motifs ({len(unique_plot_motifs)}) exceeds typical palette size. Colors may repeat.")
+    try:
+        motif_colors = sns.color_palette(palette_name, n_colors=len(unique_plot_motifs))
+        for i, motif_str in enumerate(unique_plot_motifs):
+            color_map[motif_str] = motif_colors[i]
+    except Exception as e: 
+        print(f"Warning: Could not generate specified color palette '{palette_name}'. Using defaults. Error: {e}")
+        for i, motif_str in enumerate(unique_plot_motifs): 
+             color_map[motif_str] = plt.cm.get_cmap("viridis")(i / max(1, len(unique_plot_motifs)-1) )
+    hue_order = ['All Sequences'] + unique_plot_motifs
+
+    # --- Data for Scatter Plot ---
+    plot_df_scatter = counts_df.copy()
+    plot_df_scatter['sample_numeric'] = pd.to_numeric(plot_df_scatter[sample_col], errors='coerce').fillna(0)
+    plot_df_scatter['ref_numeric'] = pd.to_numeric(plot_df_scatter[ref_col], errors='coerce').fillna(0)
+    total_sample_scatter = plot_df_scatter['sample_numeric'].sum()
+    total_ref_scatter = plot_df_scatter['ref_numeric'].sum()
+    
+    if total_sample_scatter == 0 or total_ref_scatter == 0:
+        plot_df_scatter['y_plot_values'] = plot_df_scatter['sample_numeric'] + pseudocount
+        plot_df_scatter['x_plot_values'] = plot_df_scatter['ref_numeric'] + pseudocount
+        norm_label_suffix = f"(Counts + {pseudocount})"
     else:
-        plot_df['y_plot_values'] = (plot_df['sample_numeric'] / total_sample * 1e6).fillna(0) + pseudocount
-        plot_df['x_plot_values'] = (plot_df['ref_numeric'] / total_ref * 1e6).fillna(0) + pseudocount
-        norm_label_suffix = f"(CPM + {pseudocount}, log scale)"
+        plot_df_scatter['y_plot_values'] = (plot_df_scatter['sample_numeric'] / total_sample_scatter * 1e6) + pseudocount
+        plot_df_scatter['x_plot_values'] = (plot_df_scatter['ref_numeric'] / total_ref_scatter * 1e6) + pseudocount
+        norm_label_suffix = f"(CPM + {pseudocount})"
+
+    # --- Data for Histogram Plot (Log2FC) ---
+    df_for_log2fc = counts_df[[sample_col, ref_col]].copy()
+    log2fc_df = calculate_log2fc(df_for_log2fc, 
+                                 reference_column=ref_col, 
+                                 count_threshold=log2fc_count_threshold, 
+                                 pseudocount=log2fc_pseudocount)
+
+    hist_data_list = []
+    if log2fc_df is not None and not log2fc_df.empty and sample_col in log2fc_df.columns:
+        for val in log2fc_df[sample_col].dropna():
+            hist_data_list.append({'value': val, 'group': 'All Sequences'})
 
     # --- Plotting Setup ---
-    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-    fig.suptitle(title_main, fontsize=16)
-    ax_scatter_flex = axes
-    ax_scatter_flex.scatter(plot_df['x_plot_values'], plot_df['y_plot_values'], color='grey', alpha=0.5, s=10, label='All Sequences')
-    for _ , motif in flexible_motifs_df.iterrows():
-        df_flt=plot_df.loc[motif_presence_df[motif['motif']].values]
-        ax_scatter_flex.scatter(df_flt['x_plot_values'], df_flt['y_plot_values'], alpha=0.5, s=10, label=motif['motif'])
-    ax_scatter_flex.loglog()
-    ax_scatter_flex.legend()
-    plt.show()
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    if title_main: # Check if title_main is not an empty string or None after potential auto-generation
+        fig.suptitle(title_main, fontsize=18, y=1.02)
+    ax_scatter, ax_dist = axes[0], axes[1]
 
+    # --- Subplot 1: Scatter Plot ---
+    ax_scatter.scatter(plot_df_scatter['x_plot_values'], plot_df_scatter['y_plot_values'],
+                       color=color_map['All Sequences'], alpha=0.5, s=10, label='All Sequences')
+    
+    for motif_str_to_plot in unique_plot_motifs:
+        flt_scatter = get_motif_filter_with_context(plot_df_scatter, left_context, right_context, motif_str_to_plot)
+        if not flt_scatter.any(): continue
+
+        df_flt_scatter = plot_df_scatter.loc[flt_scatter]
+        if not df_flt_scatter.empty:
+            motif_color = color_map.get(motif_str_to_plot, 'blue') 
+            ax_scatter.scatter(df_flt_scatter['x_plot_values'], df_flt_scatter['y_plot_values'],
+                               color=motif_color, alpha=0.7, s=25, label=motif_str_to_plot)
+
+            if log2fc_df is not None and not log2fc_df.empty and sample_col in log2fc_df.columns:
+                motif_sequences_in_log2fc = log2fc_df.index.intersection(plot_df_scatter.index[flt_scatter])
+                if not motif_sequences_in_log2fc.empty:
+                    motif_log2fc_values = log2fc_df.loc[motif_sequences_in_log2fc, sample_col].dropna()
+                    for val in motif_log2fc_values:
+                        hist_data_list.append({'value': val, 'group': motif_str_to_plot})
+    
+    ax_scatter.loglog()
+    ax_scatter.set_xlabel(f"{ref_col} {norm_label_suffix}, log scale")
+    ax_scatter.set_ylabel(f"{sample_col} {norm_label_suffix}, log scale")
+    ax_scatter.legend()
+    ax_scatter.grid(True, which="both", ls="--", alpha=0.4)
+    ax_scatter.set_title("Sequence Motif Abundance Comparison", fontsize=12)
+
+    # --- Subplot 2: Distribution Plot (Histogram of Log2FC) ---
+    if hist_data_list:
+        hist_df = pd.DataFrame(hist_data_list)
+        try:
+            sns.histplot(data=hist_df, x='value', hue='group', hue_order=hue_order,
+                         palette=color_map, 
+                         ax=ax_dist, 
+                         stat="density", 
+                         common_norm=False, 
+                         log_scale=(distribution_plot_log_xscale), 
+                         multiple="layer", element="bars", kde=False, bins="auto")
+            ax_dist.set_xlabel(f"log2 Fold Change ({sample_col} / {ref_col})")
+            ax_dist.set_ylabel("Density") 
+            ax_dist.set_title("Distribution of log2 Fold Change by Motif", fontsize=12)
+            ax_dist.grid(True, axis='y', ls='--', alpha=0.7)
+        except Exception as e:
+            print(f"Error during Histogram plot creation: {e}")
+            ax_dist.text(0.5, 0.5, "Error creating Histogram.", horizontalalignment='center', 
+                         verticalalignment='center', transform=ax_dist.transAxes, color='red')
+    else:
+        ax_dist.text(0.5, 0.5, "No Log2FC data for distribution.",
+                     horizontalalignment='center', verticalalignment='center',
+                     transform=ax_dist.transAxes, color='red')
+        ax_dist.set_title("Distribution of log2 Fold Change by Motif", fontsize=12)
+
+    fig.tight_layout(pad=2.0)
+
+    if save_filename:
+        try: fig.savefig(save_filename, bbox_inches='tight', dpi=300)
+        except: pass 
+    return fig, axes

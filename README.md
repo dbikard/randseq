@@ -91,7 +91,7 @@ plot_motif_analysis(counts, "JJ1886_T0", "MFDpir", flexible_motifs_df, left, rig
 
 ![](index_files/figure-commonmark/cell-4-output-1.png)
 
-### Documentation
+## Documentation
 
 Documentation can be found hosted on this GitHub
 [repository](https://github.com/dbikard/randseq)’s

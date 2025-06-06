@@ -16,7 +16,7 @@ $ pip install git+https://github.com/dbikard/randseq.git
 
 ``` python
 from randseq.core import find_restricted_motifs
-from randseq.utils import calculate_log2fc
+from randseq.utils import calculate_log2fc, get_patterns
 from randseq.example_data import get_example_data_dir
 import pandas as pd
 
@@ -35,7 +35,7 @@ log2fc_df = calculate_log2fc(counts, reference_column='MFDpir', count_threshold=
 core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1886_T0"], 
                         left,
                         right, 
-                        flexible_motif_patterns=[(6,0,0),(4,4,4),(3,4,4),(2,4,3),(3,5,4)],
+                        flexible_motif_patterns=[(6,0,0),(4,4,3),(4,3,4)], #alternatively you can get a comprehensive list of patterns using randseq.utils.get_patterns()
                         )
 ```
 
@@ -48,19 +48,46 @@ core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1
 
     --- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---
     Filtered log2fc_series for flexible analysis: 11275 sequences remaining.
-    Looking for pattern: (6, 0, 0)
-    Looking for pattern: (4, 4, 4)
-    Looking for pattern: (3, 4, 4)
-    Looking for pattern: (2, 4, 3)
-    Looking for pattern: (3, 5, 4)
+    Found hits with pattern: (6, 0, 0)
+           motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    4091  GGTCTC                1.0              9   -4.313837  (6, 0, 0)
+    4092  GAGACC                1.0              9   -4.313837  (6, 0, 0)
+    Found hits with pattern: (4, 4, 3)
+                 motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    7334   GTACNNNNGTG                1.0             20   -5.237623  (4, 4, 3)
+    14362  ATACNNNNGTG                1.0              5   -4.428066  (4, 4, 3)
+    15147  AAAGNNNNGTT                1.0             21   -5.325198  (4, 4, 3)
+    Found hits with pattern: (4, 3, 4)
+                 motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    10013  CACCNNNGTAC                1.0              9   -5.092974  (4, 3, 4)
+    10024  GTACNNNGGTG                1.0              9   -5.092974  (4, 3, 4)
+    36070  AAAGNNNCGTT                1.0              5   -6.057519  (4, 3, 4)
+    36071  AACGNNNCTTT                1.0              5   -6.057519  (4, 3, 4)
+    40731  AAAGNNNGGTT                1.0              6   -5.306290  (4, 3, 4)
+    40735  AACCNNNCTTT                1.0              6   -5.306290  (4, 3, 4)
+    43244  AACTNNNCTTT                1.0              4   -5.328530  (4, 3, 4)
+    43245  AAAGNNNAGTT                1.0              4   -5.328530  (4, 3, 4)
+    45967  GTACNNNTGTG                1.0              4   -6.086366  (4, 3, 4)
+    45970  CACANNNGTAC                1.0              4   -6.086366  (4, 3, 4)
+    48262  AACANNNCTTT                1.0              6   -4.731617  (4, 3, 4)
+    48264  AAAGNNNTGTT                1.0              6   -4.731617  (4, 3, 4)
+    58947  GTACNNNCGTG                1.0              4   -5.025342  (4, 3, 4)
+    58948  CACGNNNGTAC                1.0              4   -5.025342  (4, 3, 4)
 
-    Identified 21 raw flexible motifs. Now filtering to core flexible motifs...
-    Found 5 core flexible motifs:
-      - Flex Motif: GAGACC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
-      - Flex Motif: AACNNNNCTTT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.33, N: 21
-      - Flex Motif: CACNNNNGTAC (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -5.24, N: 20
-      - Flex Motif: CACNNNNGTAT (from pattern (3, 4, 4)), FracDep: 1.00, AvgFC: -4.43, N: 5
-      - Flex Motif: GAGGNNNNGGTC (from pattern (4, 4, 4)), FracDep: 1.00, AvgFC: -4.36, N: 4
+    Identified 19 raw flexible motifs. Now filtering to core flexible motifs...
+    Found 4 core flexible motifs:
+    GGTCTC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
+    GTACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.24, N: 20
+    ATACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.43, N: 5
+    AAAGNNNNGTT (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.33, N: 21
+
+    Now flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds
+
+    4 motifs remaining:
+    GGTCTC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
+    GTACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.06, N: 19
+    ATACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.73, N: 191
+    AAAGNNNNGTT (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.04, N: 61
 
 ``` python
 flexible_motifs_df
@@ -79,13 +106,12 @@ flexible_motifs_df
     }
 </style>
 
-|     | motif        | fraction_depleted | num_sequences | avg_log2fc | pattern   |
-|-----|--------------|-------------------|---------------|------------|-----------|
-| 0   | GAGACC       | 1.0               | 9             | -4.313837  | (6, 0, 0) |
-| 1   | AACNNNNCTTT  | 1.0               | 21            | -5.325198  | (3, 4, 4) |
-| 2   | CACNNNNGTAC  | 1.0               | 20            | -5.237623  | (3, 4, 4) |
-| 3   | CACNNNNGTAT  | 1.0               | 5             | -4.428066  | (3, 4, 4) |
-| 4   | GAGGNNNNGGTC | 1.0               | 4             | -4.357958  | (4, 4, 4) |
+|     | motif       | fraction_depleted | num_sequences | avg_log2fc | pattern   |
+|-----|-------------|-------------------|---------------|------------|-----------|
+| 0   | GGTCTC      | 1.0               | 9             | -4.313837  | (6, 0, 0) |
+| 2   | GTACNNNNGTG | 1.0               | 19            | -5.062006  | (4, 4, 3) |
+| 3   | ATACNNNNGTG | 1.0               | 191           | -4.732529  | (4, 4, 3) |
+| 4   | AAAGNNNNGTT | 1.0               | 61            | -5.037651  | (4, 4, 3) |
 
 </div>
 

@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['IUPAC_DNA_TO_BASES', 'IUPAC_DNA_TO_REGEX', 'IUPAC_COMPLEMENT', 'bases', 'flatten', 'calculate_log2fc', 'revcomp',
            'allseqs', 'get_all_sites', 'get_lib_seq_context', 'check_specific_matches_broad_iupac',
-           'get_motif_filter_with_context', 'generate_tuple_combinations', 'get_patterns']
+           'get_motif_filter_with_context', 'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns']
 
 # %% ../nbs/01_utils.ipynb 3
 import pandas as pd
@@ -282,5 +282,55 @@ def generate_tuple_combinations(a1, a2, b1, b2, c1, c2):
 
 
 # %% ../nbs/01_utils.ipynb 28
+def filter_symmetric_tuples(list_of_tuples):
+    """
+    Filters a list of 3-integer tuples, removing specific symmetric pairs.
+
+    This function removes a tuple if another tuple exists in the list that is
+    its mirror image by swapping the first and third elements. For example, 
+    (1, 2, 3) is considered a symmetric pair with (3, 2, 1). When such a pair 
+    is found, only the first one encountered in the original list is kept.
+
+    Args:
+        list_of_tuples: A list of tuples, where each tuple contains three integers.
+
+    Returns:
+        A new list of tuples with the symmetric pairs removed.
+    """
+    # This set will store the canonical representation of tuples we have 
+    # already encountered. The canonical form is the smaller of a tuple and
+    # its symmetric version, ensuring we can identify pairs efficiently.
+    seen_canonical_forms = set()
+    
+    # This list will hold the final, filtered tuples.
+    filtered_list = []
+
+    # Iterate through each tuple in the input list.
+    for tup in list_of_tuples:
+        # Create the specific symmetric counterpart by swapping the first and last elements.
+        symmetric_tup = (tup[2], tup[1], tup[0])
+
+        # Determine the canonical form by picking the lexicographically smaller
+        # of the original tuple and its symmetric version. This makes the
+        # representation consistent for any pair.
+        canonical_form = min(tup, symmetric_tup)
+
+        # If the canonical form is already in our 'seen' set, it means we have
+        # already processed this tuple or its symmetric pair, so we skip it.
+        if canonical_form in seen_canonical_forms:
+            continue
+
+        # If the canonical form has not been seen, we add the original tuple
+        # to our result list.
+        filtered_list.append(tup)
+        
+        # Add the canonical form to the 'seen' set. This ensures that the
+        # other member of the symmetric pair will be skipped if encountered later.
+        seen_canonical_forms.add(canonical_form)
+        
+    return filtered_list
+
+# %% ../nbs/01_utils.ipynb 30
 def get_patterns():
-    return generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,2,4)
+    patterns = generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,2,4)
+    return filter_symmetric_tuples(patterns)

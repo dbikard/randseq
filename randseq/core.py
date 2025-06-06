@@ -718,21 +718,21 @@ def find_restricted_motifs(log2fc_series,
             for _, row in flexible_motifs_results_df.iterrows():
                  print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
 
-    print("\nNow flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
-    
-    flexible_motifs_results_df = update_motif_scores_from_unique_hits(flexible_motifs_results_df, 
-                                                                      log2fc_series, 
-                                                                      left_context_str, 
-                                                                      right_context_str, 
-                                                                      flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-                                                                      flexible_motif_min_support=flexible_motif_min_support,
-                                                                      flexible_motif_score_thr=flexible_motif_score_thr)
-    
-    print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
-    if flexible_motifs_results_df.empty:
-        print("No core flexible motifs remained after filtering.")
-    else:                                                                                                                             
-        for _, row in flexible_motifs_results_df.iterrows():
-            print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
+            print("\nNow flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
+            
+            flexible_motifs_results_df = update_motif_scores_from_unique_hits(flexible_motifs_results_df, 
+                                                                            log2fc_series, 
+                                                                            left_context_str, 
+                                                                            right_context_str, 
+                                                                            flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
+                                                                            flexible_motif_min_support=flexible_motif_min_support,
+                                                                            flexible_motif_score_thr=flexible_motif_score_thr)
+            
+            print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
+            if flexible_motifs_results_df.empty:
+                print("No core flexible motifs remained after filtering.")
+            else:                                                                                                                             
+                for _, row in flexible_motifs_results_df.iterrows():
+                    print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
 
     return core_fixed_motifs_df, flexible_motifs_results_df

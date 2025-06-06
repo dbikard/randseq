@@ -9,23 +9,18 @@ __all__ = ['get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends'
 
 # %% ../nbs/00_core.ipynb 3
 import pandas as pd
-import seaborn as sns
 from tqdm import tqdm
 import re
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import pearsonr,spearmanr
 import os
-from collections import Counter, defaultdict
+from collections import  defaultdict
 import re
 from random import choice
 from itertools import groupby, chain
 from operator import itemgetter
-import os
 from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, check_specific_matches_broad_iupac, _get_filter_for_motif
-import ast
 from typing import List, Tuple, Set, Callable
-from random import choice
+
 
 # %% ../nbs/00_core.ipynb 11
 # Helper function to create regex group strings for the main function
@@ -668,7 +663,7 @@ def find_restricted_motifs(log2fc_series,
         print("Warning: flexible_motif_patterns should be a list. Wrapping it in a list.")
         flexible_motif_patterns = [flexible_motif_patterns]
     
-    for current_flex_pattern in flexible_motif_patterns:
+    for current_flex_pattern in tqdm(flexible_motif_patterns):
         
         site_sets_flexible = get_sites_in_seq(
             sequences_with_context_for_flex, 

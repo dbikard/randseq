@@ -22,7 +22,7 @@ from random import choice
 from itertools import groupby, chain
 from operator import itemgetter
 import os
-from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, check_specific_matches_broad_iupac, get_motif_filter_with_context
+from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, check_specific_matches_broad_iupac, _get_filter_for_motif
 import ast
 from typing import List, Tuple, Set, Callable
 from random import choice
@@ -555,11 +555,11 @@ def update_motif_scores_from_unique_hits(
         # --- Start of merged logic from analyze_motif_uniqueness ---
         other_motifs = [m for m in all_motifs if m != current_motif]
 
-        matches_current_filter = get_motif_filter_with_context(log2fc_series, left_context, right_context, current_motif)
+        matches_current_filter = _get_filter_for_motif(log2fc_series, current_motif, left_context, right_context)
 
         matches_other_filter = pd.Series(False, index=log2fc_series.index)
         for other_motif in other_motifs:
-            matches_other_filter |= get_motif_filter_with_context(log2fc_series, left_context, right_context, other_motif)
+            matches_other_filter |= _get_filter_for_motif(log2fc_series, other_motif, left_context, right_context)
             
         final_filter = matches_current_filter & ~matches_other_filter
         

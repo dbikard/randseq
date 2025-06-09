@@ -5,16 +5,18 @@
 # %% auto 0
 __all__ = ['IUPAC_DNA_TO_BASES', 'IUPAC_DNA_TO_REGEX', 'IUPAC_COMPLEMENT', 'bases', 'flatten', 'calculate_log2fc', 'revcomp',
            'allseqs', 'get_all_sites', 'get_lib_seq_context', 'check_specific_matches_broad_iupac',
-           'get_motif_filter_with_context', 'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns']
+           'check_specific_matches_broad', 'find_broad_in_specific', 'get_motif_filter_with_context',
+           'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns', 'create_motif_presence_matrix']
 
-# %% ../nbs/01_utils.ipynb 3
+# %% ../nbs/01_utils.ipynb 4
 import pandas as pd
 import re
 import numpy as np
 import os
 import itertools
+from random import choice
 
-# %% ../nbs/01_utils.ipynb 5
+# %% ../nbs/01_utils.ipynb 6
 # IUPAC DNA codes mapping for sequence generation
 IUPAC_DNA_TO_BASES = {
     'A': ['A'], 'C': ['C'], 'G': ['G'], 'T': ['T'], 'R': ['A', 'G'],
@@ -39,7 +41,7 @@ IUPAC_COMPLEMENT = {
 }
 
 
-# %% ../nbs/01_utils.ipynb 6
+# %% ../nbs/01_utils.ipynb 7
 def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudocount=1):
     """
     Filters a DataFrame, normalizes columns by sum, calculates log2 fold change
@@ -55,6 +57,8 @@ def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudoco
         pd.DataFrame: DataFrame with log2 fold change values. None if reference
                       column is missing. Empty DataFrame if all rows are filtered out.
     """
+    
+    df = df.replace(np.nan,0)
     if reference_column not in df.columns:
         print(f"Error: Reference column '{reference_column}' not found in DataFrame.")
         return None
@@ -102,13 +106,13 @@ def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudoco
         
     return log2fc_df
 
-# %% ../nbs/01_utils.ipynb 9
+# %% ../nbs/01_utils.ipynb 10
 def revcomp(seq:str):
     '''Computes the reverse complement of a sequence'''
     trns=str.maketrans("ATGCN","TACGN")
     return seq.upper().translate(trns)[::-1]
 
-# %% ../nbs/01_utils.ipynb 11
+# %% ../nbs/01_utils.ipynb 12
 bases=list("ATGC")
 def allseqs(n,seqs=[""]):
     '''Recursive function that generates all possible sequences of length n
@@ -120,16 +124,16 @@ def allseqs(n,seqs=[""]):
     else:
         return seqs
 
-# %% ../nbs/01_utils.ipynb 13
+# %% ../nbs/01_utils.ipynb 14
 flatten = lambda l: [item for sublist in l for item in sublist]
 
-# %% ../nbs/01_utils.ipynb 15
+# %% ../nbs/01_utils.ipynb 16
 def get_all_sites(pattern):
     #generates a list of all sites that match the pattern
     return [s[:pattern[0]]+"N"*pattern[1]+s[pattern[0]:] for s in allseqs(pattern[0]+pattern[2])]
 
 
-# %% ../nbs/01_utils.ipynb 17
+# %% ../nbs/01_utils.ipynb 18
 def get_lib_seq_context(seqs,left,right):
     """
     Generates a list of sequences by combining a left and right sequence with each sequence in the input list.
@@ -147,7 +151,7 @@ def get_lib_seq_context(seqs,left,right):
     lib=[left+r+right for r in seqs]
     return lib
 
-# %% ../nbs/01_utils.ipynb 19
+# %% ../nbs/01_utils.ipynb 20
 def _generate_sequences_from_iupac(iupac_pattern_str):
     """Generates concrete DNA sequences from an IUPAC pattern."""
     if not iupac_pattern_str:
@@ -196,7 +200,70 @@ def check_specific_matches_broad_iupac(specific_iupac_pattern, broad_iupac_patte
 
 
 
-# %% ../nbs/01_utils.ipynb 21
+# %% ../nbs/01_utils.ipynb 22
+def check_specific_matches_broad(specific, broad):
+  """
+  Checks if a 'specific' string matches a 'broad' string with a wildcard rule.
+
+  This function compares two strings of the same length. The character 'N' in 
+  the 'broad' string acts as a wildcard that can match any single character 
+  in the 'specific' string at the same position. An 'N' in the 'specific' 
+  string does not have any special meaning and is treated as a literal 'N'.
+
+  Args:
+    specific: The string that is being checked.
+    broad: The string that contains the pattern, where 'N' is a wildcard.
+
+  Returns:
+    True if the 'specific' string matches the 'broad' pattern, False otherwise.
+  """
+  if len(specific) != len(broad):
+    return False
+
+  for spec_char, broad_char in zip(specific, broad):
+    if spec_char == broad_char or broad_char == 'N':
+      continue
+    return False
+  return True
+
+def find_broad_in_specific(specific, broad):
+  """
+  Finds if a 'broad' DNA motif exists within a 'specific' DNA sequence, checking
+  both forward and reverse complement orientations of the motif.
+
+  If len(specific) < len(broad), it's impossible to find the motif, so it
+  returns False. It first checks for the motif in the forward direction. If no match
+  is found, it checks for the reverse complement of the motif.
+
+  Args:
+    specific: The DNA sequence to be searched within.
+    broad: The DNA motif (pattern with 'N' wildcards) to search for.
+
+  Returns:
+    True if 'broad' or its reverse complement is found in 'specific', False otherwise.
+  """
+  if len(specific) < len(broad):
+    return False
+  
+  broad_len = len(broad)
+  if broad_len == 0:
+      return True
+
+  # 1. Check the forward orientation
+  is_forward_match = any(check_specific_matches_broad(specific[i:i + broad_len], broad) 
+                         for i in range(len(specific) - broad_len + 1))
+  
+  if is_forward_match:
+    return True
+
+  # 2. If no forward match, check the reverse complement orientation
+  broad_rev_comp = revcomp(broad)
+  is_reverse_match = any(check_specific_matches_broad(specific[i:i + broad_len], broad_rev_comp) 
+                         for i in range(len(specific) - broad_len + 1))
+
+  return is_reverse_match
+
+# %% ../nbs/01_utils.ipynb 24
 def get_motif_filter_with_context(df, left_context, right_context, motif):
     """
     Returns a boolean filter for the DataFrame to select rows whose index (sequence)
@@ -231,7 +298,7 @@ def get_motif_filter_with_context(df, left_context, right_context, motif):
 
     return df.index.to_series().apply(contains_motif)
 
-# %% ../nbs/01_utils.ipynb 23
+# %% ../nbs/01_utils.ipynb 26
 def _get_filter_for_motif(series, motif, left_context, right_context):
     """
     Returns a boolean filter for a Series to select rows whose index (sequence)
@@ -254,7 +321,7 @@ def _get_filter_for_motif(series, motif, left_context, right_context):
     except (KeyError, ValueError, re.error):
         return pd.Series(False, index=series.index)
 
-# %% ../nbs/01_utils.ipynb 25
+# %% ../nbs/01_utils.ipynb 28
 def generate_tuple_combinations(a1, a2, b1, b2, c1, c2):
   """
   Generates a list of tuples with all possible number combinations within given ranges.
@@ -281,7 +348,7 @@ def generate_tuple_combinations(a1, a2, b1, b2, c1, c2):
   return combinations
 
 
-# %% ../nbs/01_utils.ipynb 28
+# %% ../nbs/01_utils.ipynb 31
 def filter_symmetric_tuples(list_of_tuples):
     """
     Filters a list of 3-integer tuples, removing specific symmetric pairs.
@@ -330,7 +397,79 @@ def filter_symmetric_tuples(list_of_tuples):
         
     return filtered_list
 
-# %% ../nbs/01_utils.ipynb 30
+# %% ../nbs/01_utils.ipynb 33
 def get_patterns():
-    patterns = generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,2,4)
-    return filter_symmetric_tuples(patterns)
+    patterns = generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,3,4)
+    patterns = filter_symmetric_tuples(patterns)
+    patterns = sorted(patterns, key=lambda x: (x[0]+x[2], x[1])) 
+    return patterns
+
+# %% ../nbs/01_utils.ipynb 37
+def create_motif_presence_matrix(
+    sequences,
+    motif_sets
+) -> pd.DataFrame:
+    """
+    Efficiently creates a presence/absence matrix from lists of sequences and their motifs.
+
+    This function is optimized for performance and memory, making it suitable
+    for very large datasets.
+
+    Args:
+        sequences: A list of sequence strings. An empty list is handled.
+        motif_sets: A list of sets, where each set contains the motifs
+                    found in the corresponding sequence.
+
+    Returns:
+        A pandas DataFrame with sequences as the index, unique motifs as
+        columns, and boolean values indicating presence (True) or
+        absence (False) of a motif in a sequence.
+
+    Raises:
+        ValueError: If the 'sequences' and 'motif_sets' lists are not the
+                    same length.
+    """
+    # --- 1. Input Validation ---
+    if len(sequences) != len(motif_sets):
+        raise ValueError(
+            "The 'sequences' and 'motif_sets' lists must be of the same length."
+        )
+
+    if not sequences:
+        return pd.DataFrame() # Return an empty DataFrame if input is empty
+
+    # --- 2. Flatten Data into Long Format ---
+    # Create a generator of (sequence, motif) pairs for memory efficiency.
+    # This processes only the motifs that are actually present.
+    long_format_generator = (
+        (sequence, motif)
+        for sequence, motifs in zip(sequences, motif_sets)
+        for motif in motifs
+    )
+
+    # Create an intermediate DataFrame from the generator
+    df_long = pd.DataFrame(long_format_generator, columns=['sequence', 'motif'])
+
+    # --- 3. Handle Edge Case: No Motifs Found ---
+    # If df_long is empty, it means no motifs exist in any set.
+    # We return a DataFrame of all False values.
+    if df_long.empty:
+        # Create an empty index with the correct name to match the non-empty case
+        idx = pd.Index(sequences, name='sequence')
+        return pd.DataFrame(False, index=idx, columns=[])
+
+    # --- 4. Pivot to Create the Matrix ---
+    df_long['present'] = True
+    presence_matrix = df_long.pivot_table(
+        index='sequence',
+        columns='motif',
+        values='present',
+        fill_value=False
+    )
+
+    # --- 5. Ensure All Sequences are Included ---
+    # Reindex ensures that sequences with no motifs are still included as rows
+    # of all False values. This is crucial for correctness.
+    final_df = presence_matrix.reindex(sequences, fill_value=False)
+
+    return final_df

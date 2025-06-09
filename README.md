@@ -48,46 +48,90 @@ core_fixed_motifs_df, flexible_motifs_df = find_restricted_motifs(log2fc_df["JJ1
 
     --- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---
     Filtered log2fc_series for flexible analysis: 11275 sequences remaining.
+
+     33%|███▎      | 1/3 [00:00<00:01,  1.11it/s]
+
     Found hits with pattern: (6, 0, 0)
            motif  fraction_depleted  num_sequences  avg_log2fc    pattern
     4091  GGTCTC                1.0              9   -4.313837  (6, 0, 0)
     4092  GAGACC                1.0              9   -4.313837  (6, 0, 0)
+    Found 2 candidate(s) for pattern (6, 0, 0). Filtering against previous results...
+      -> 1 core motifs remain after filtering.
+        motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    0  GGTCTC                1.0              9   -4.313837  (6, 0, 0)
+
+     67%|██████▋   | 2/3 [00:02<00:01,  1.07s/it]
+
     Found hits with pattern: (4, 4, 3)
                  motif  fraction_depleted  num_sequences  avg_log2fc    pattern
-    7334   GTACNNNNGTG                1.0             20   -5.237623  (4, 4, 3)
+    7332   GTACNNNNGTG                1.0             20   -5.237623  (4, 4, 3)
+    14360  GCACNNNNGTA                0.8              5   -3.848971  (4, 4, 3)
     14362  ATACNNNNGTG                1.0              5   -4.428066  (4, 4, 3)
     15147  AAAGNNNNGTT                1.0             21   -5.325198  (4, 4, 3)
+    Found 4 candidate(s) for pattern (4, 4, 3). Filtering against previous results...
+      -> 5 core motifs remain after filtering.
+             motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    0       GGTCTC                1.0              9   -4.313837  (6, 0, 0)
+    1  GTACNNNNGTG                1.0             20   -5.237623  (4, 4, 3)
+    2  GCACNNNNGTA                0.8              5   -3.848971  (4, 4, 3)
+    3  ATACNNNNGTG                1.0              5   -4.428066  (4, 4, 3)
+    4  AAAGNNNNGTT                1.0             21   -5.325198  (4, 4, 3)
+
+    100%|██████████| 3/3 [00:03<00:00,  1.21s/it]
+
     Found hits with pattern: (4, 3, 4)
                  motif  fraction_depleted  num_sequences  avg_log2fc    pattern
-    10013  CACCNNNGTAC                1.0              9   -5.092974  (4, 3, 4)
-    10024  GTACNNNGGTG                1.0              9   -5.092974  (4, 3, 4)
-    36070  AAAGNNNCGTT                1.0              5   -6.057519  (4, 3, 4)
-    36071  AACGNNNCTTT                1.0              5   -6.057519  (4, 3, 4)
-    40731  AAAGNNNGGTT                1.0              6   -5.306290  (4, 3, 4)
-    40735  AACCNNNCTTT                1.0              6   -5.306290  (4, 3, 4)
-    43244  AACTNNNCTTT                1.0              4   -5.328530  (4, 3, 4)
-    43245  AAAGNNNAGTT                1.0              4   -5.328530  (4, 3, 4)
-    45967  GTACNNNTGTG                1.0              4   -6.086366  (4, 3, 4)
-    45970  CACANNNGTAC                1.0              4   -6.086366  (4, 3, 4)
-    48262  AACANNNCTTT                1.0              6   -4.731617  (4, 3, 4)
-    48264  AAAGNNNTGTT                1.0              6   -4.731617  (4, 3, 4)
-    58947  GTACNNNCGTG                1.0              4   -5.025342  (4, 3, 4)
-    58948  CACGNNNGTAC                1.0              4   -5.025342  (4, 3, 4)
+    10022  GTACNNNGGTG           1.000000              9   -5.092974  (4, 3, 4)
+    10030  CACCNNNGTAC           1.000000              9   -5.092974  (4, 3, 4)
+    17961  TACGNNNGTGA           0.714286              7   -3.547885  (4, 3, 4)
+    17978  TCACNNNCGTA           0.714286              7   -3.547885  (4, 3, 4)
+    31274  TGAGNNNTCTG           0.750000              4   -4.077213  (4, 3, 4)
+    31277  CAGANNNCTCA           0.750000              4   -4.077213  (4, 3, 4)
+    36066  AACGNNNCTTT           1.000000              5   -6.057519  (4, 3, 4)
+    36067  AAAGNNNCGTT           1.000000              5   -6.057519  (4, 3, 4)
+    36069  AAGTNNNGTTA           0.833333              6   -4.729768  (4, 3, 4)
+    36072  TAACNNNACTT           0.833333              6   -4.729768  (4, 3, 4)
+    37398  ACACNNNCGTA           0.800000              5   -4.230048  (4, 3, 4)
+    37401  TACGNNNGTGT           0.800000              5   -4.230048  (4, 3, 4)
+    40737  AACCNNNCTTT           1.000000              6   -5.306290  (4, 3, 4)
+    40738  AAAGNNNGGTT           1.000000              6   -5.306290  (4, 3, 4)
+    43240  AACTNNNCTTT           1.000000              4   -5.328530  (4, 3, 4)
+    43248  AAAGNNNAGTT           1.000000              4   -5.328530  (4, 3, 4)
+    45966  GTACNNNTGTG           1.000000              4   -6.086366  (4, 3, 4)
+    45970  CACANNNGTAC           1.000000              4   -6.086366  (4, 3, 4)
+    46663  GAACNNNCCTT           0.750000              4   -3.221192  (4, 3, 4)
+    46668  AAGGNNNGTTC           0.750000              4   -3.221192  (4, 3, 4)
+    48261  AAAGNNNTGTT           1.000000              6   -4.731617  (4, 3, 4)
+    48263  AACANNNCTTT           1.000000              6   -4.731617  (4, 3, 4)
+    54506  GAGGNNNCAGG           0.750000              4   -3.945381  (4, 3, 4)
+    54511  CCTGNNNCCTC           0.750000              4   -3.945381  (4, 3, 4)
+    58947  GTACNNNCGTG           1.000000              4   -5.025342  (4, 3, 4)
+    58948  CACGNNNGTAC           1.000000              4   -5.025342  (4, 3, 4)
+    Found 26 candidate(s) for pattern (4, 3, 4). Filtering against previous results...
+      -> 11 core motifs remain after filtering.
+              motif  fraction_depleted  num_sequences  avg_log2fc    pattern
+    0        GGTCTC           1.000000              9   -4.313837  (6, 0, 0)
+    1   GTACNNNNGTG           1.000000             20   -5.237623  (4, 4, 3)
+    2   GCACNNNNGTA           0.800000              5   -3.848971  (4, 4, 3)
+    3   ATACNNNNGTG           1.000000              5   -4.428066  (4, 4, 3)
+    4   AAAGNNNNGTT           1.000000             21   -5.325198  (4, 4, 3)
+    7   TACGNNNGTGA           0.714286              7   -3.547885  (4, 3, 4)
+    9   TGAGNNNTCTG           0.750000              4   -4.077213  (4, 3, 4)
+    13  AAGTNNNGTTA           0.833333              6   -4.729768  (4, 3, 4)
+    15  ACACNNNCGTA           0.800000              5   -4.230048  (4, 3, 4)
+    23  GAACNNNCCTT           0.750000              4   -3.221192  (4, 3, 4)
+    27  GAGGNNNCAGG           0.750000              4   -3.945381  (4, 3, 4)
 
-    Identified 19 raw flexible motifs. Now filtering to core flexible motifs...
-    Found 4 core flexible motifs:
-    GGTCTC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
-    GTACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.24, N: 20
-    ATACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.43, N: 5
-    AAAGNNNNGTT (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.33, N: 21
+    Identified 11 raw flexible motifs. Now filtering to core flexible motifs...
 
     Now flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds
 
+
     4 motifs remaining:
-    GGTCTC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -4.31, N: 9
-    GTACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.06, N: 19
-    ATACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.73, N: 191
-    AAAGNNNNGTT (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.04, N: 61
+    GGTCTC (from pattern (6, 0, 0)), FracDep: 1.00, AvgFC: -3.75, N: 6
+    GTACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.90, N: 9
+    ATACNNNNGTG (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -4.75, N: 147
+    AAAGNNNNGTT (from pattern (4, 4, 3)), FracDep: 1.00, AvgFC: -5.02, N: 54
 
 ``` python
 flexible_motifs_df
@@ -108,10 +152,10 @@ flexible_motifs_df
 
 |     | motif       | fraction_depleted | num_sequences | avg_log2fc | pattern   |
 |-----|-------------|-------------------|---------------|------------|-----------|
-| 0   | GGTCTC      | 1.0               | 9             | -4.313837  | (6, 0, 0) |
-| 2   | GTACNNNNGTG | 1.0               | 19            | -5.062006  | (4, 4, 3) |
-| 3   | ATACNNNNGTG | 1.0               | 191           | -4.732529  | (4, 4, 3) |
-| 4   | AAAGNNNNGTT | 1.0               | 61            | -5.037651  | (4, 4, 3) |
+| 0   | GGTCTC      | 1.0               | 6             | -3.750094  | (6, 0, 0) |
+| 1   | GTACNNNNGTG | 1.0               | 9             | -4.901973  | (4, 4, 3) |
+| 3   | ATACNNNNGTG | 1.0               | 147           | -4.746092  | (4, 4, 3) |
+| 4   | AAAGNNNNGTT | 1.0               | 54            | -5.018200  | (4, 4, 3) |
 
 </div>
 

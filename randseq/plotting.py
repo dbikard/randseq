@@ -5,7 +5,7 @@
 # %% auto 0
 __all__ = ['plot_motif_analysis']
 
-# %% ../nbs/02_plotting.ipynb 3
+# %% ../nbs/02_plotting.ipynb 4
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ import os
 from .core import find_restricted_motifs
 from .utils import calculate_log2fc, get_motif_filter_with_context
 
-# %% ../nbs/02_plotting.ipynb 5
+# %% ../nbs/02_plotting.ipynb 6
 def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
                         left_context, right_context,
                         title_main=None, # Changed default to None for auto-generation
@@ -107,7 +107,7 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
         if not df_flt_scatter.empty:
             motif_color = color_map.get(motif_str_to_plot, 'blue') 
             ax_scatter.scatter(df_flt_scatter['x_plot_values'], df_flt_scatter['y_plot_values'],
-                               color=motif_color, alpha=0.7, s=25, label=motif_str_to_plot)
+                               color=motif_color, alpha=0.5, s=25, label=motif_str_to_plot)
 
             if log2fc_df is not None and not log2fc_df.empty and sample_col in log2fc_df.columns:
                 motif_sequences_in_log2fc = log2fc_df.index.intersection(plot_df_scatter.index[flt_scatter])
@@ -137,7 +137,7 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
             ax_dist.set_xlabel(f"log2 Fold Change ({sample_col} / {ref_col})")
             ax_dist.set_ylabel("Density") 
             ax_dist.set_title("Distribution of log2 Fold Change by Motif", fontsize=12)
-            ax_dist.grid(True, axis='y', ls='--', alpha=0.7)
+            ax_dist.grid(True, axis='y', ls='--', alpha=0.5)
         except Exception as e:
             print(f"Error during Histogram plot creation: {e}")
             ax_dist.text(0.5, 0.5, "Error creating Histogram.", horizontalalignment='center', 

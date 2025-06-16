@@ -84,10 +84,6 @@ def get_sites_in_seq(
     except IndexError: # Should be caught by the above, but for safety
         raise ValueError("Sequence library cannot be empty.")
 
-    if not all(len(s) == first_seq_len for s in sequence_library):
-        raise ValueError("Not all sequences in the library have the same length.")
-    sequence_length = first_seq_len
-
     if not (
         isinstance(pattern, tuple) and
         len(pattern) == 3 and
@@ -106,10 +102,11 @@ def get_sites_in_seq(
         # as it would match everywhere. It's better to disallow it.
         raise ValueError("The total length of the site pattern (sum of its parts) cannot be zero.")
 
-    if pattern_total_length > sequence_length:
+    shorter_seq = min([len(s) for s in sequence_library])
+    if pattern_total_length > shorter_seq:
         raise ValueError(
             f"Site pattern's total length ({pattern_total_length}) is longer than "
-            f"the sequence length ({sequence_length})."
+            f"the shorter sequence length ({shorter_seq})."
         )
 
     # --- Regex Preparation ---

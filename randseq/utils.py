@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['bases', 'flatten', 'calculate_log2fc', 'revcomp', 'allseqs', 'get_all_sites', 'get_lib_seq_context',
-           'get_motif_presence_in_library']
+           'get_motif_presence_in_library', 'get_custom_motif_presence_in_library']
 
 # %% ../nbs/01_utils.ipynb 3
 import pandas as pd
@@ -180,6 +180,62 @@ def get_motif_presence_in_library(short_sequences_list, left_context, right_cont
 
     if not presence_data:
         return pd.DataFrame(index=valid_full_sequences, columns=unique_flexible_motifs)
+
+    presence_df = pd.DataFrame(presence_data)
+    if 'full_sequence' in presence_df.columns:
+        presence_df = presence_df.set_index('full_sequence')
+        
+    return presence_df
+
+# %% ../nbs/01_utils.ipynb 19
+def get_custom_motif_presence_in_library(short_sequences_list, left_context, right_context, motif_list):
+    """
+    Creates a DataFrame indicating the presence of flexible motifs in sequences (with context).
+
+    Args:
+        short_sequences_list (list): List of original short DNA sequences.
+        left_context (str): Left context string to prepend.
+        right_context (str): Right context string to append.
+        flexible_motifs_df (pd.DataFrame): DataFrame of flexible motifs, must include
+                                           a 'motif' column with motif strings (e.g., 'AACNNNNCTTT').
+
+    Returns:
+        pd.DataFrame: DataFrame with full sequences (with context) as index,
+                      flexible motif strings as columns, and boolean values indicating presence.
+    """
+    full_sequences_with_context = get_lib_seq_context(short_sequences_list, left_context, right_context)
+
+    # Filter out None entries from full_sequences_with_context which may arise from non-string inputs to get_lib_seq_context
+    # and keep track of original indices to align with short_sequences_list if needed for other purposes,
+    # though for this function, we just use the valid full sequences.
+    valid_full_sequences = [seq for seq in full_sequences_with_context if isinstance(seq, str)]
+    if not valid_full_sequences:
+        print("No valid full sequences to process after adding context.")
+        return pd.DataFrame()
+    presence_data = []
+
+    for full_seq_str in valid_full_sequences:
+        row_data = {'full_sequence': full_seq_str}
+        for flex_motif_str in motif_list:
+            if not isinstance(flex_motif_str, str) or not flex_motif_str:
+                row_data[flex_motif_str] = False # Or handle as error/skip
+                continue
+            # Convert 'N' to '[ATGC]' for regex matching
+            regex_pattern = flex_motif_str.replace('N', '[ATGC]')
+            try:
+                if re.search(regex_pattern, full_seq_str):
+                    row_data[flex_motif_str] = True
+                elif re.search(regex_pattern, revcomp(full_seq_str)):
+                    row_data[flex_motif_str] = True
+                else:
+                    row_data[flex_motif_str] = False
+            except re.error:
+                # print(f"Warning: Regex error for motif '{flex_motif_str}' (pattern: '{regex_pattern}'). Marking as False.")
+                row_data[flex_motif_str] = False
+        presence_data.append(row_data)
+
+    if not presence_data:
+        return pd.DataFrame(index=valid_full_sequences, columns=motif_list)
 
     presence_df = pd.DataFrame(presence_data)
     if 'full_sequence' in presence_df.columns:

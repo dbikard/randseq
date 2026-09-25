@@ -1,4 +1,8 @@
-from pkg_resources import parse_version
+#from pkg_resources import parse_version
+#from configparser import ConfigParser
+#import setuptools, shlex
+#assert parse_version(setuptools.__version__)>=parse_version('36.2')
+from packaging.version import Version as parse_version
 from configparser import ConfigParser
 import setuptools, shlex
 assert parse_version(setuptools.__version__)>=parse_version('36.2')

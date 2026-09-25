@@ -2,4 +2,5 @@ include settings.ini
 include LICENSE
 include CONTRIBUTING.md
 include README.md
+recursive-include randseq/example_data *.csv *.csv.gz
 recursive-exclude * __pycache__

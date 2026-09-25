@@ -6,7 +6,8 @@
 __all__ = ['IUPAC_DNA_TO_BASES', 'IUPAC_DNA_TO_REGEX', 'IUPAC_COMPLEMENT', 'bases', 'flatten', 'calculate_log2fc', 'revcomp',
            'allseqs', 'get_all_sites', 'get_lib_seq_context', 'check_specific_matches_broad_iupac',
            'check_specific_matches_broad', 'find_broad_in_specific', 'get_motif_filter_with_context',
-           'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns', 'create_motif_presence_matrix']
+           'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns', 'create_motif_presence_matrix',
+           'get_custom_motif_presence_in_library', 'get_log2fc_distribution_by_motif']
 
 # %% ../nbs/01_utils.ipynb 4
 import pandas as pd
@@ -473,3 +474,110 @@ def create_motif_presence_matrix(
     final_df = presence_matrix.reindex(sequences, fill_value=False)
 
     return final_df
+
+# %% ../nbs/01_utils.ipynb 41
+def get_custom_motif_presence_in_library(short_sequences_list, left_context, right_context, motif_list):
+    """
+    Creates a DataFrame indicating the presence of flexible motifs in sequences (with context).
+
+    Args:
+        short_sequences_list (list): List of original short DNA sequences.
+        left_context (str): Left context string to prepend.
+        right_context (str): Right context string to append.
+        flexible_motifs_df (pd.DataFrame): DataFrame of flexible motifs, must include
+                                           a 'motif' column with motif strings (e.g., 'AACNNNNCTTT').
+
+    Returns:
+        pd.DataFrame: DataFrame with full sequences (with context) as index,
+                      flexible motif strings as columns, and boolean values indicating presence.
+    """
+    full_sequences_with_context = get_lib_seq_context(short_sequences_list, left_context, right_context)
+
+    # Filter out None entries from full_sequences_with_context which may arise from non-string inputs to get_lib_seq_context
+    # and keep track of original indices to align with short_sequences_list if needed for other purposes,
+    # though for this function, we just use the valid full sequences.
+    valid_full_sequences = [seq for seq in full_sequences_with_context if isinstance(seq, str)]
+    if not valid_full_sequences:
+        print("No valid full sequences to process after adding context.")
+        return pd.DataFrame()
+    presence_data = []
+
+    for full_seq_str in valid_full_sequences:
+        row_data = {'full_sequence': full_seq_str}
+        for flex_motif_str in motif_list:
+            if not isinstance(flex_motif_str, str) or not flex_motif_str:
+                row_data[flex_motif_str] = False # Or handle as error/skip
+                continue
+            # Convert 'N' to '[ATGC]' for regex matching
+            regex_pattern = flex_motif_str.replace('N', '[ATGC]')
+            try:
+                if re.search(regex_pattern, full_seq_str):
+                    row_data[flex_motif_str] = True
+                elif re.search(regex_pattern, revcomp(full_seq_str)):
+                    row_data[flex_motif_str] = True
+                else:
+                    row_data[flex_motif_str] = False
+            except re.error:
+                # print(f"Warning: Regex error for motif '{flex_motif_str}' (pattern: '{regex_pattern}'). Marking as False.")
+                row_data[flex_motif_str] = False
+        presence_data.append(row_data)
+
+    if not presence_data:
+        return pd.DataFrame(index=valid_full_sequences, columns=motif_list)
+
+    presence_df = pd.DataFrame(presence_data)
+    if 'full_sequence' in presence_df.columns:
+        presence_df = presence_df.set_index('full_sequence')
+        
+    return presence_df
+
+# %% ../nbs/01_utils.ipynb 42
+def get_log2fc_distribution_by_motif(log2fc_df, left_context, right_context, motif_list, sample_columns=None):
+    """
+    Categorizes each sequence in log2fc_df by which motif (if any) it contains,
+    and reshapes to long format for distribution comparison/plotting.
+
+    Args:
+        log2fc_df (pd.DataFrame): DataFrame of log2 fold change values, indexed by short
+                                   sequence (rows=features, columns=samples).
+        left_context (str): Left context string to prepend before motif search.
+        right_context (str): Right context string to append before motif search.
+        motif_list (list): List of motif strings (e.g. ['CAAGNNNNNGGT']), using 'N' as wildcard.
+                            If a sequence matches multiple motifs, the LAST matching motif
+                            in motif_list wins (same precedence as plot_motif_ggplot).
+        sample_columns (list, optional): Subset of columns (samples) from log2fc_df to include.
+                                          Defaults to all columns.
+
+    Returns:
+        pd.DataFrame: Long-format DataFrame with columns ['sequence', 'Motif_Category',
+                      'sample', 'log2fc']. 'Motif_Category' is one of motif_list or 'Other'.
+                      None if motif presence could not be computed.
+    """
+    if sample_columns is None:
+        sample_columns = log2fc_df.columns.tolist()
+
+    # Positionally aligned with log2fc_df.index (order preserved by get_lib_seq_context),
+    # same approach as plot_motif_ggplot.
+    presence_df = get_custom_motif_presence_in_library(
+        log2fc_df.index.tolist(), left_context, right_context, motif_list
+    )
+
+    if presence_df.empty:
+        print("Error: could not compute motif presence.")
+        return None
+
+    df = log2fc_df[sample_columns].copy()
+    df['Motif_Category'] = 'Other'
+
+    for motif in motif_list:
+        df.loc[presence_df[motif].values, 'Motif_Category'] = motif
+
+    index_name = df.index.name or 'index'
+    long_df = (
+        df.reset_index()
+          .melt(id_vars=[index_name, 'Motif_Category'], value_vars=sample_columns,
+                var_name='sample', value_name='log2fc')
+          .rename(columns={index_name: 'sequence'})
+    )
+
+    return long_df

@@ -190,5 +190,5 @@ $ pip install -e .
 # ...
 
 # compile to have changes apply to randseq
-$ nbdev_prepare
+$ nbdev-prepare
 ```

@@ -1,3 +1,30 @@
 [build-system]
-requires = ["setuptools>=64.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "randseq"
+dynamic = ["version"]
+description = "inferring restricted motifs using the  RandSeq method"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+authors = [{name = "dbikard", email = "dbikard@gmail.com"}]
+keywords = ['nbdev', 'jupyter', 'notebook', 'python']
+classifiers = ["Natural Language :: English", "Intended Audience :: Developers", "Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only"]
+dependencies = ['fastcore', 'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'tqdm', 'pyahocorasick', 'plotnine']
+
+[project.urls]
+Repository = "https://github.com/dbikard/randseq"
+Documentation = "https://dbikard.github.io/randseq"
+
+[project.entry-points.nbdev]
+randseq = "randseq._modidx:d"
+
+[tool.setuptools.dynamic]
+version = {attr = "randseq.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["randseq*"]
+
+[tool.nbdev]

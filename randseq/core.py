@@ -5,8 +5,9 @@
 # %% auto 0
 __all__ = ['get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends', 'filter_to_core_motifs',
            'get_fold_change_values_per_site', 'filter_sequences_without_core_motifs', 'get_sites_scores',
+           'encode_library', 'decode_motif_codes', 'get_pattern_scores', 'process_single_flexible_pattern',
            'filter_redundant_patterns', 'update_motif_scores_from_unique_hits', 'find_restricted_motifs',
-           'process_single_flexible_pattern', 'find_restricted_motifs_mp']
+           'find_restricted_motifs_mp']
 
 # %% ../nbs/00_core.ipynb 4
 import pandas as pd
@@ -450,71 +451,224 @@ def get_sites_scores(site_FCs, pattern, log2FC_thr=-1):
         return pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
     return pd.DataFrame(site_scores_list)
 
-# %% ../nbs/00_core.ipynb 26
+# %% ../nbs/00_core.ipynb 27
+_BASE_CODES = np.full(256, 4, dtype=np.uint8)  # 4 = anything that is not A/C/G/T
+for _i, _b in enumerate("ACGT"):
+    _BASE_CODES[ord(_b)] = _BASE_CODES[ord(_b.lower())] = _i
+_CODE_BASES = np.frombuffer(b"ACGT", dtype=np.uint8)
+
+def encode_library(sequences):
+    """
+    Encodes DNA sequences as 2-bit base codes for `get_pattern_scores`.
+
+    Args:
+        sequences (list): DNA strings (typically library sequences with context);
+            they may have different lengths.
+
+    Returns:
+        tuple: (fwd, rc) uint8 arrays of shape (n_sequences, max_length) holding the
+            base codes of each sequence and of its reverse complement. A=0, C=1, G=2,
+            T=3; non-ACGT characters and the padding of shorter sequences are 4.
+    """
+    max_len = max(len(s) for s in sequences)
+    fwd = np.full((len(sequences), max_len), 4, dtype=np.uint8)
+    rc = np.full_like(fwd, 4)
+    for i, s in enumerate(sequences):
+        codes = _BASE_CODES[np.frombuffer(s.encode(), dtype=np.uint8)]
+        fwd[i, :len(s)] = codes
+        rc[i, :len(s)] = np.where(codes < 4, 3 - codes, 4)[::-1]  # A<->T, C<->G
+    return fwd, rc
+
+# %% ../nbs/00_core.ipynb 29
+def _pattern_window_codes(encoded_seqs, pattern):
+    """
+    Motif code of every window of every sequence for `pattern` (d1, spacer, d2).
+    Returns an int32 array of shape (n_sequences, n_windows); windows containing a
+    base coded 4 (non-ACGT or padding) get the out-of-range code 4**(d1+d2).
+    """
+    d1, spacer, d2 = pattern
+    width = d1 + spacer + d2
+    n_windows = encoded_seqs.shape[1] - width + 1
+    codes = np.zeros((encoded_seqs.shape[0], n_windows), dtype=np.int32)
+    for j in list(range(d1)) + list(range(d1 + spacer, width)):  # defined positions only
+        codes *= 4
+        codes += encoded_seqs[:, j:j + n_windows]
+    # Like the [ATGC] regex, reject windows with a non-ACGT base anywhere, spacer included.
+    n_bad = np.zeros((encoded_seqs.shape[0], encoded_seqs.shape[1] + 1), dtype=np.int32)
+    np.cumsum(encoded_seqs == 4, axis=1, out=n_bad[:, 1:])
+    codes[n_bad[:, width:] != n_bad[:, :n_windows]] = 4 ** (d1 + d2)
+    return codes
+
+def decode_motif_codes(codes, pattern):
+    """
+    Converts integer motif codes of `pattern` (d1, spacer, d2) back to motif strings
+    with 'N' in the spacer, e.g. CACNNNNGTAT for pattern (3, 4, 4).
+    """
+    d1, spacer, d2 = pattern
+    n_defined = d1 + d2
+    codes = np.asarray(codes, dtype=np.int64)
+    out = np.full((len(codes), d1 + spacer + d2), ord("N"), dtype=np.uint8)
+    bases = _CODE_BASES[(codes[:, None] >> (2 * np.arange(n_defined - 1, -1, -1))) & 3]
+    out[:, :d1], out[:, d1 + spacer:] = bases[:, :d1], bases[:, d1:]
+    return out.view(f"S{out.shape[1]}").ravel().astype(str).tolist()
+
+# %% ../nbs/00_core.ipynb 32
+def get_pattern_scores(encoded_library, fc_values, pattern, log2FC_thr=-1):
+    """
+    Scores every motif of `pattern` found in the library, on both strands.
+
+    Vectorized equivalent of
+    `get_sites_scores(get_fold_change_values_per_site(get_sites_in_seq(seqs, pattern, no_ori=True), fc_values), pattern, log2FC_thr)`:
+    a motif is counted once per sequence that contains it on either strand.
+
+    Args:
+        encoded_library (tuple): (fwd, rc) arrays from `encode_library`.
+        fc_values (list or np.ndarray): log2FC of each sequence, in library order.
+        pattern (tuple): (d1, spacer, d2) motif pattern.
+        log2FC_thr (float): a sequence is depleted when its log2FC is below this value.
+
+    Returns:
+        pd.DataFrame: one row per motif with 'motif', 'fraction_depleted',
+            'num_sequences' and 'avg_log2fc', ordered by the first sequence that
+            contains the motif.
+    """
+    fwd, rc = encoded_library
+    fc_values = np.asarray(fc_values, dtype=float)
+    n_codes = 4 ** (pattern[0] + pattern[2])
+    codes = np.concatenate([_pattern_window_codes(fwd, pattern), _pattern_window_codes(rc, pattern)], axis=1)
+    # Keep each motif once per sequence: sort each row and drop repeats and rejected windows.
+    codes.sort(axis=1)
+    keep = codes < n_codes
+    keep[:, 1:] &= codes[:, 1:] != codes[:, :-1]
+    seq_idx = np.nonzero(keep)[0]
+    motif_codes = codes[keep]
+    seq_fc = fc_values[seq_idx]
+    n_seqs = np.bincount(motif_codes, minlength=n_codes)
+    n_depleted = np.bincount(motif_codes, weights=seq_fc < log2FC_thr, minlength=n_codes)
+    fc_sum = np.bincount(motif_codes, weights=seq_fc, minlength=n_codes)
+    first_seq = np.full(n_codes, len(fc_values))
+    np.minimum.at(first_seq, motif_codes, seq_idx)
+    present = np.flatnonzero(n_seqs)
+    present = present[np.argsort(first_seq[present], kind="stable")]
+    return pd.DataFrame({
+        'motif': decode_motif_codes(present, pattern),
+        'fraction_depleted': n_depleted[present] / n_seqs[present],
+        'num_sequences': n_seqs[present],
+        'avg_log2fc': fc_sum[present] / n_seqs[present],
+    })
+
+# %% ../nbs/00_core.ipynb 37
+def process_single_flexible_pattern(
+    current_flex_pattern,
+    encoded_library,
+    fc_values_for_flexible_analysis,
+    flexible_motif_log2fc_thr,
+    flexible_motif_score_thr,
+    flexible_motif_min_support
+):
+    """
+    Scores all motifs of one flexible pattern and keeps the candidates with
+    fraction_depleted > flexible_motif_score_thr and num_sequences > flexible_motif_min_support.
+
+    Args:
+        current_flex_pattern (tuple): (d1, spacer, d2) motif pattern.
+        encoded_library (tuple): (fwd, rc) arrays from `encode_library` (sequences with context).
+        fc_values_for_flexible_analysis (list): log2FC of each sequence, in library order.
+        flexible_motif_log2fc_thr (float): log2FC below which a sequence counts as depleted.
+        flexible_motif_score_thr (float): minimum fraction_depleted (exclusive).
+        flexible_motif_min_support (int): minimum number of sequences (exclusive).
+
+    Returns:
+        pd.DataFrame: candidate motifs with 'motif', 'fraction_depleted', 'num_sequences',
+            'avg_log2fc' and 'pattern' (the pattern as a string).
+    """
+    scores = get_pattern_scores(encoded_library, fc_values_for_flexible_analysis,
+                                current_flex_pattern, log2FC_thr=flexible_motif_log2fc_thr)
+    scores['pattern'] = str(current_flex_pattern)
+    return scores[(scores['fraction_depleted'] > flexible_motif_score_thr) &
+                  (scores['num_sequences'] > flexible_motif_min_support)]
+
+# %% ../nbs/00_core.ipynb 39
 def filter_redundant_patterns(df, score_margin=0.05):
     """
-    Filters a DataFrame of  patterns, removing redundant motifs based on
+    Filters a DataFrame of patterns, removing redundant motifs based on
     specificity and a score condition.
 
     A motif 'p1' is considered redundant and removed if there is another
     motif 'p2' in the DataFrame such that:
-    1. p1 is a specific version of p2 
-    2. The score condition is met: p2.score > p1.score - score_margin.
-    3. For equivalent motifs, the one with the lower score is dropped. If
-       scores are equal, the one with the higher original index is dropped.
+
+    1. p1 is a specific version of p2 AND
+       p2.score > p1.score - score_margin
+       (general is not significantly worse  → drop specific)
+
+    OR
+
+    2. p1 is a general version of p2 AND
+       p2.score > p1.score + score_margin
+       (specific is significantly better → drop general)
+
+    3. For equivalent motifs the one with the lower score is dropped.
+       If scores are equal, the one with the higher reset-index is dropped.
 
     Args:
-        df (pd.DataFrame): DataFrame with 'motif' and 'score' columns.
-        score_margin (float): A margin to relax the score comparison.
+        df (pd.DataFrame): DataFrame with 'motif' and 'fraction_depleted'
+            columns.
+        score_margin (float): Margin used to relax score comparisons.
 
     Returns:
         pd.DataFrame: A filtered DataFrame with redundant rows removed.
     """
     indices_to_drop = set()
-    # Use a reset index to simplify looping, but keep original for final drop
     df_reset = df.reset_index()
 
     for i, p1 in df_reset.iterrows():
         if i in indices_to_drop:
             continue
-            
+
         for j, p2 in df_reset.iterrows():
-            if i == j:
+            if i == j or j in indices_to_drop:
                 continue
 
             motif1, score1 = p1['motif'], p1['fraction_depleted']
             motif2, score2 = p2['motif'], p2['fraction_depleted']
 
-            is_subset = find_broad_in_specific(motif1, motif2)
+            is_p1_subset_of_p2 = find_broad_in_specific(motif1, motif2)
 
-            if not is_subset:
+            if not is_p1_subset_of_p2:
                 continue
 
-            # motif1 is a subset of motif2. Now check if it should be dropped.
-            is_superset = find_broad_in_specific(motif2, motif1)
+            is_p2_subset_of_p1 = find_broad_in_specific(motif2, motif1)
 
-            if not is_superset:
-                # motif1 is a STRICT subset of motif2.
-                # Drop motif1 if the score condition is met.
+            if not is_p2_subset_of_p1:
+                # p1 is STRICTLY more specific than p2 (p2 is the general motif).
+
                 if score2 > score1 - score_margin:
+                    # General motif (p2) is not significantly worse → drop
+                    # the specific one (p1).
                     indices_to_drop.add(i)
-                    break 
+                    break
+
+                elif score1 > score2 + score_margin:
+                    # Specific motif (p1) is significantly better → drop
+                    # the general one (p2).
+                    indices_to_drop.add(j)
+                    # Do NOT break: p1 might still be redundant w.r.t. other
+                    # motifs in a later iteration.
+
             else:
-                # They are equivalent. Tie-break:
-                # 1. Drop the one with the lower score.
-                # 2. If scores are equal, drop the one with the higher index.
+                # p1 and p2 are equivalent.  Drop the worse one; break ties
+                # by higher reset-index.
                 if score1 < score2:
                     indices_to_drop.add(i)
                     break
                 elif score1 == score2 and i > j:
                     indices_to_drop.add(i)
                     break
-    
-    # Get original indices of rows to drop
+
     original_indices_to_drop = df_reset.loc[list(indices_to_drop)]['index']
     return df.drop(original_indices_to_drop)
 
-# %% ../nbs/00_core.ipynb 27
+# %% ../nbs/00_core.ipynb 40
 def update_motif_scores_from_unique_hits(
     flexible_motifs_df,
     log2fc_series,
@@ -525,8 +679,8 @@ def update_motif_scores_from_unique_hits(
     flexible_motif_score_thr=0.85
 ):
     """
-    Updates a DataFrame of motifs with new scores based on unique sequence hits
-    and filters the result based on the provided thresholds.
+    Updates a DataFrame of motifs with new scores based on unique sequence
+    hits (sequences not matched by any other motif) and filters the result.
 
     Args:
         flexible_motifs_df (pd.DataFrame): DataFrame with a 'motif' column.
@@ -543,27 +697,29 @@ def update_motif_scores_from_unique_hits(
     new_metrics = []
     all_motifs = flexible_motifs_df['motif'].tolist()
 
-    for current_motif in all_motifs:
-        other_motifs = [m for m in all_motifs if m != current_motif]
+    # Pre-compute filter for every motif once to avoid redundant .apply() calls.
+    motif_filters = {}
+    print("  Pre-computing sequence filters for each motif...")
+    for m in tqdm(all_motifs, desc="  Building filters"):
+        motif_filters[m] = _get_filter_for_motif(log2fc_series, m, left_context, right_context)
 
-        matches_current_filter = _get_filter_for_motif(log2fc_series, current_motif, left_context, right_context)
+    print("  Scoring motifs on unique hits...")
+    for current_motif in tqdm(all_motifs, desc="  Scoring motifs"):
+        matches_current_filter = motif_filters[current_motif]
 
         matches_other_filter = pd.Series(False, index=log2fc_series.index)
-        for other_motif in other_motifs:
-            matches_other_filter |= _get_filter_for_motif(log2fc_series, other_motif, left_context, right_context)
-            
+        for other_motif, other_filter in motif_filters.items():
+            if other_motif != current_motif:
+                matches_other_filter = matches_other_filter | other_filter
+
         final_filter = matches_current_filter & ~matches_other_filter
-        
         filtered_series = log2fc_series[final_filter]
-    
 
         log2fc_values = filtered_series.values
-        
         num_sequences = len(log2fc_values)
-        # Use the passed threshold for scoring
         fraction_depleted = score(log2fc_values, thr=flexible_motif_log2fc_thr)
         avg_log2fc = np.mean(log2fc_values) if num_sequences > 0 else 0.0
-        
+
         new_metrics.append({
             'fraction_depleted': fraction_depleted,
             'num_sequences': num_sequences,
@@ -572,366 +728,23 @@ def update_motif_scores_from_unique_hits(
 
     df_updated = flexible_motifs_df.copy()
     metrics_df = pd.DataFrame(new_metrics, index=df_updated.index)
-    
+
     df_updated['fraction_depleted'] = metrics_df['fraction_depleted']
     df_updated['num_sequences'] = metrics_df['num_sequences']
     df_updated['avg_log2fc'] = metrics_df['avg_log2fc']
 
-    # Apply final thresholds to filter the updated DataFrame
-    # The condition for avg_log2fc should be less than or equal to the threshold
     final_df = df_updated[
         (df_updated['avg_log2fc'] <= flexible_motif_log2fc_thr) &
         (df_updated['num_sequences'] >= flexible_motif_min_support) &
         (df_updated['fraction_depleted'] >= flexible_motif_score_thr)
     ]
-    
+
     return final_df
 
-# %% ../nbs/00_core.ipynb 28
-def find_restricted_motifs(log2fc_series, 
-                           left_context_str, 
-                           right_context_str, 
-                           fixed_motif_scan_depth_k=6,
-                           fixed_motif_max_length=4,
-                           fixed_motif_depletion_thr=-1,
-                           fixed_motif_score_thr=0.85,
-                           fixed_motif_min_support=5,
-                           core_motif_score_margin=0.05, # For fixed motifs
-                           flexible_motif_patterns=[(6,0,0),(3,4,4)], 
-                           flexible_motif_log2fc_thr=-1,
-                           flexible_motif_min_support=3,
-                           flexible_motif_score_thr=0.7,
-                           core_flexible_motif_score_margin=0.2 # For flexible motifs
-                           ):
-    """
-    Full pipeline to identify fixed-position core motifs and then position-independent motifs
-    (from a list of patterns) in the remaining sequences (with context for flexible search).
-    """
-    print("--- Starting Fixed-Position Motif Analysis (on original short sequences) ---")
-    depleted_fixed_motifs_df = identify_depleted_motifs_scanning_ends(
-        log2fc_series, 
-        scan_depth_k=fixed_motif_scan_depth_k,
-        max_motif_length=fixed_motif_max_length,
-        depletion_threshold=fixed_motif_depletion_thr,
-        score_thr=fixed_motif_score_thr,
-        min_sequence_support=fixed_motif_min_support
-    )
-    core_fixed_motifs_df = filter_to_core_motifs( 
-        depleted_fixed_motifs_df,
-        score_improvement_margin=core_motif_score_margin
-    )
-    del depleted_fixed_motifs_df
+# %% ../nbs/00_core.ipynb 41
+import warnings
 
-    if core_fixed_motifs_df.empty:
-        print("No core motifs found at fixed positions.")
-    else:
-        print(f"Found {len(core_fixed_motifs_df)} core motifs at fixed positions:")
-        for _, row in core_fixed_motifs_df.iterrows():
-            print(f"  - Fixed Motif: {row['motif']}, Pos: {row['position']}, Len: {row['length']}, FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
-
-    print("\n--- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---")
-    log2fc_series_for_flexible_analysis = filter_sequences_without_core_motifs(
-        log2fc_series, 
-        core_fixed_motifs_df 
-    )
-    if len(log2fc_series_for_flexible_analysis) == len(log2fc_series):
-        print("No sequences were filtered out based on fixed-position core motifs (or no core motifs found).")
-    else:
-        print(f"Filtered log2fc_series for flexible analysis: {len(log2fc_series_for_flexible_analysis)} sequences remaining.")
-
-    if log2fc_series_for_flexible_analysis.empty:
-        print("No sequences remaining for flexible motif analysis after filtering.")
-        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc']) 
-        return core_fixed_motifs_df, flexible_motifs_results_df
-
-    short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
-    sequences_with_context_for_flex = get_lib_seq_context(
-        short_sequences_for_flex_analysis, 
-        left_context_str, 
-        right_context_str
-    )
-    fc_values_for_flexible_analysis = log2fc_series_for_flexible_analysis.tolist()
-    del log2fc_series_for_flexible_analysis
-    
-    cumulative_flexible_motifs_df = pd.DataFrame()
-
-    if not isinstance(flexible_motif_patterns, list):
-        print("Warning: flexible_motif_patterns should be a list. Wrapping it in a list.")
-        flexible_motif_patterns = [flexible_motif_patterns]
-
-    flexible_motif_patterns = sorted(flexible_motif_patterns, key=lambda x: (x[0]+x[2], x[1]))  #sorting the patterns by complexity (defined positions and spacer length)
-    
-    for current_flex_pattern in tqdm(flexible_motif_patterns):
-        
-        site_sets_flexible = get_sites_in_seq(
-            sequences_with_context_for_flex, 
-            pattern=current_flex_pattern, 
-            no_ori=True 
-        )
-        if len(site_sets_flexible) != len(fc_values_for_flexible_analysis):
-            print(f"    Error: Mismatch in length between site sets ({len(site_sets_flexible)}) and FC values ({len(fc_values_for_flexible_analysis)}) for pattern {current_flex_pattern}. Skipping this pattern.")
-            continue
-
-        site_fcs_flexible = get_fold_change_values_per_site(
-            site_sets_flexible,
-            fc_values_for_flexible_analysis 
-        )
-        del site_sets_flexible # Free memory
-
-        current_pattern_scores_df = get_sites_scores( 
-            site_fcs_flexible,
-            pattern=current_flex_pattern, 
-            log2FC_thr=flexible_motif_log2fc_thr
-        )
-        
-        if not current_pattern_scores_df.empty:
-            current_pattern_scores_df.rename(columns={'site': 'motif'}, inplace=True) 
-            current_pattern_scores_df['pattern'] = str(current_flex_pattern) 
-            filtered_for_this_pattern = current_pattern_scores_df[
-                (current_pattern_scores_df['fraction_depleted'] > flexible_motif_score_thr) &
-                (current_pattern_scores_df['num_sequences'] > flexible_motif_min_support)
-            ]
-            if len(filtered_for_this_pattern)>0: 
-                print(f"Found hits with pattern: {current_flex_pattern}")
-                print(filtered_for_this_pattern)
-            
-            if not filtered_for_this_pattern.empty:
-                print(f"Found {len(filtered_for_this_pattern)} candidate(s) for pattern {current_flex_pattern}. Filtering against previous results...")
-                
-                # Combine with previous results and filter iteratively
-                combined_before_filtering = pd.concat([cumulative_flexible_motifs_df, filtered_for_this_pattern], ignore_index=True)
-                
-                cumulative_flexible_motifs_df = filter_redundant_patterns(
-                    combined_before_filtering,
-                    score_margin=core_flexible_motif_score_margin,
-                )
-                print(f"  -> {len(cumulative_flexible_motifs_df)} core motifs remain after filtering.")
-                print(cumulative_flexible_motifs_df)
-
-
-    if cumulative_flexible_motifs_df.empty:
-        print(f"\nNo flexible motifs found meeting initial support > {flexible_motif_min_support} and score > {flexible_motif_score_thr} for any provided pattern.")
-        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc']) 
-    else:
-        print(f"\nIdentified {len(cumulative_flexible_motifs_df)} raw flexible motifs. Now filtering to core flexible motifs...")
-        print("\nNow flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
-            
-        flexible_motifs_results_df = update_motif_scores_from_unique_hits(cumulative_flexible_motifs_df, 
-                                                                        log2fc_series, 
-                                                                        left_context_str, 
-                                                                        right_context_str, 
-                                                                        flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-                                                                        flexible_motif_min_support=flexible_motif_min_support,
-                                                                        flexible_motif_score_thr=flexible_motif_score_thr)
-        
-        print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
-        if flexible_motifs_results_df.empty:
-            print("No core flexible motifs remained after filtering.")
-        else:                                                                                                                             
-            for _, row in flexible_motifs_results_df.iterrows():
-                print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
-
-    return core_fixed_motifs_df, flexible_motifs_results_df
-
-# %% ../nbs/00_core.ipynb 29
-def find_restricted_motifs(log2fc_series, 
-                           left_context_str, 
-                           right_context_str, 
-                           fixed_motif_scan_depth_k=6,
-                           fixed_motif_max_length=4,
-                           fixed_motif_depletion_thr=-1,
-                           fixed_motif_score_thr=0.85,
-                           fixed_motif_min_support=5,
-                           core_motif_score_margin=0.05, # For fixed motifs
-                           flexible_motif_patterns=[(6,0,0)], 
-                           flexible_motif_log2fc_thr=-1,
-                           flexible_motif_min_support=3,
-                           flexible_motif_score_thr=0.7,
-                           core_flexible_motif_score_margin=0.2 # For flexible motifs
-                           ):
-    """
-    Full pipeline to identify fixed-position core motifs and then position-independent motifs
-    (from a list of patterns) in the remaining sequences (with context for flexible search).
-    """
-    print("--- Starting Fixed-Position Motif Analysis (on original short sequences) ---")
-    depleted_fixed_motifs_df = identify_depleted_motifs_scanning_ends(
-        log2fc_series, 
-        scan_depth_k=fixed_motif_scan_depth_k,
-        max_motif_length=fixed_motif_max_length,
-        depletion_threshold=fixed_motif_depletion_thr,
-        score_thr=fixed_motif_score_thr,
-        min_sequence_support=fixed_motif_min_support
-    )
-    core_fixed_motifs_df = filter_to_core_motifs( 
-        depleted_fixed_motifs_df,
-        score_improvement_margin=core_motif_score_margin
-    )
-    del depleted_fixed_motifs_df
-
-    if core_fixed_motifs_df.empty:
-        print("No core motifs found at fixed positions.")
-    else:
-        print(f"Found {len(core_fixed_motifs_df)} core motifs at fixed positions:")
-        for _, row in core_fixed_motifs_df.iterrows():
-            print(f"  - Fixed Motif: {row['motif']}, Pos: {row['position']}, Len: {row['length']}, FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
-
-    print("\n--- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---")
-    log2fc_series_for_flexible_analysis = filter_sequences_without_core_motifs(
-        log2fc_series, 
-        core_fixed_motifs_df 
-    )
-    if len(log2fc_series_for_flexible_analysis) == len(log2fc_series):
-        print("No sequences were filtered out based on fixed-position core motifs (or no core motifs found).")
-    else:
-        print(f"Filtered log2fc_series for flexible analysis: {len(log2fc_series_for_flexible_analysis)} sequences remaining.")
-
-    if log2fc_series_for_flexible_analysis.empty:
-        print("No sequences remaining for flexible motif analysis after filtering.")
-        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc']) 
-        return core_fixed_motifs_df, flexible_motifs_results_df
-
-    short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
-    sequences_with_context_for_flex = get_lib_seq_context(
-        short_sequences_for_flex_analysis, 
-        left_context_str, 
-        right_context_str
-    )
-    fc_values_for_flexible_analysis = log2fc_series_for_flexible_analysis.tolist()
-    del log2fc_series_for_flexible_analysis
-    
-    cumulative_flexible_motifs_df = pd.DataFrame()
-
-    if not isinstance(flexible_motif_patterns, list):
-        print("Warning: flexible_motif_patterns should be a list. Wrapping it in a list.")
-        flexible_motif_patterns = [flexible_motif_patterns]
-
-    flexible_motif_patterns = sorted(flexible_motif_patterns, key=lambda x: (x[0]+x[2], x[1]))  #sorting the patterns by complexity (defined positions and spacer length)
-    
-    for current_flex_pattern in tqdm(flexible_motif_patterns):
-        
-        site_sets_flexible = get_sites_in_seq(
-            sequences_with_context_for_flex, 
-            pattern=current_flex_pattern, 
-            no_ori=True 
-        )
-        if len(site_sets_flexible) != len(fc_values_for_flexible_analysis):
-            print(f"    Error: Mismatch in length between site sets ({len(site_sets_flexible)}) and FC values ({len(fc_values_for_flexible_analysis)}) for pattern {current_flex_pattern}. Skipping this pattern.")
-            continue
-
-        site_fcs_flexible = get_fold_change_values_per_site(
-            site_sets_flexible,
-            fc_values_for_flexible_analysis 
-        )
-        del site_sets_flexible # Free memory
-
-        current_pattern_scores_df = get_sites_scores( 
-            site_fcs_flexible,
-            pattern=current_flex_pattern, 
-            log2FC_thr=flexible_motif_log2fc_thr
-        )
-        
-        if not current_pattern_scores_df.empty:
-            current_pattern_scores_df.rename(columns={'site': 'motif'}, inplace=True) 
-            current_pattern_scores_df['pattern'] = str(current_flex_pattern) 
-            filtered_for_this_pattern = current_pattern_scores_df[
-                (current_pattern_scores_df['fraction_depleted'] > flexible_motif_score_thr) &
-                (current_pattern_scores_df['num_sequences'] > flexible_motif_min_support)
-            ]
-            if len(filtered_for_this_pattern)>0: 
-                print(f"Found hits with pattern: {current_flex_pattern}")
-                print(filtered_for_this_pattern)
-            
-            if not filtered_for_this_pattern.empty:
-                print(f"Found {len(filtered_for_this_pattern)} candidate(s) for pattern {current_flex_pattern}. Filtering against previous results...")
-                
-                # Combine with previous results and filter iteratively
-                combined_before_filtering = pd.concat([cumulative_flexible_motifs_df, filtered_for_this_pattern], ignore_index=True)
-                
-                cumulative_flexible_motifs_df = filter_redundant_patterns(
-                    combined_before_filtering,
-                    score_margin=core_flexible_motif_score_margin,
-                )
-                print(f"  -> {len(cumulative_flexible_motifs_df)} core motifs remain after filtering.")
-                print(cumulative_flexible_motifs_df)
-
-
-    if cumulative_flexible_motifs_df.empty:
-        print(f"\nNo flexible motifs found meeting initial support > {flexible_motif_min_support} and score > {flexible_motif_score_thr} for any provided pattern.")
-        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc']) 
-    else:
-        print(f"\nIdentified {len(cumulative_flexible_motifs_df)} raw flexible motifs. Now filtering to core flexible motifs...")
-        print("\nNow flitering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
-            
-        flexible_motifs_results_df = update_motif_scores_from_unique_hits(cumulative_flexible_motifs_df, 
-                                                                        log2fc_series, 
-                                                                        left_context_str, 
-                                                                        right_context_str, 
-                                                                        flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-                                                                        flexible_motif_min_support=flexible_motif_min_support,
-                                                                        flexible_motif_score_thr=flexible_motif_score_thr)
-        
-        print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
-        if flexible_motifs_results_df.empty:
-            print("No core flexible motifs remained after filtering.")
-        else:                                                                                                                             
-            for _, row in flexible_motifs_results_df.iterrows():
-                print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
-
-    return core_fixed_motifs_df, flexible_motifs_results_df
-
-# %% ../nbs/00_core.ipynb 35
-from multiprocessing import Pool, cpu_count
-import functools # To pass fixed arguments to the parallel function
-
-
-def process_single_flexible_pattern(
-    current_flex_pattern,
-    sequences_with_context_for_flex,
-    fc_values_for_flexible_analysis,
-    flexible_motif_log2fc_thr,
-    flexible_motif_score_thr,
-    flexible_motif_min_support
-):
-    """
-    Helper function to process a single flexible motif pattern.
-    This function will be called in parallel.
-    """
-    # print(f"  Processing pattern: {current_flex_pattern}") # Can uncomment for debugging parallel runs
-
-    site_sets_flexible = get_sites_in_seq(
-        sequences_with_context_for_flex,
-        pattern=current_flex_pattern,
-        no_ori=True
-    )
-    if len(site_sets_flexible) != len(fc_values_for_flexible_analysis):
-        print(f"    Error: Mismatch in length between site sets ({len(site_sets_flexible)}) and FC values ({len(fc_values_for_flexible_analysis)}) for pattern {current_flex_pattern}. Skipping this pattern.")
-        return pd.DataFrame() # Return empty DataFrame if error
-
-    site_fcs_flexible = get_fold_change_values_per_site(
-        site_sets_flexible,
-        fc_values_for_flexible_analysis
-    )
-    # del site_sets_flexible # Cannot del in a parallel function as it's not a copy
-
-    current_pattern_scores_df = get_sites_scores(
-        site_fcs_flexible,
-        pattern=current_flex_pattern,
-        log2FC_thr=flexible_motif_log2fc_thr
-    )
-
-    if not current_pattern_scores_df.empty:
-        current_pattern_scores_df.rename(columns={'site': 'motif'}, inplace=True)
-        current_pattern_scores_df['pattern'] = str(current_flex_pattern)
-        filtered_for_this_pattern = current_pattern_scores_df[
-            (current_pattern_scores_df['fraction_depleted'] > flexible_motif_score_thr) &
-            (current_pattern_scores_df['num_sequences'] > flexible_motif_min_support)
-        ]
-        # print(f"    Found {len(filtered_for_this_pattern)} hits for pattern {current_flex_pattern}") # Can uncomment for debugging
-        return filtered_for_this_pattern
-    return pd.DataFrame()
-
-
-def find_restricted_motifs_mp(log2fc_series,
+def find_restricted_motifs(log2fc_series,
                            left_context_str,
                            right_context_str,
                            fixed_motif_scan_depth_k=6,
@@ -939,16 +752,32 @@ def find_restricted_motifs_mp(log2fc_series,
                            fixed_motif_depletion_thr=-1,
                            fixed_motif_score_thr=0.85,
                            fixed_motif_min_support=5,
-                           core_motif_score_margin=0.05,  # For fixed motifs
-                           flexible_motif_patterns=[(6, 0, 0), (3, 4, 4)],
+                           core_motif_score_margin=0.05,
+                           flexible_motif_patterns=[(6,0,0),(3,4,4)],
                            flexible_motif_log2fc_thr=-1,
                            flexible_motif_min_support=3,
                            flexible_motif_score_thr=0.7,
-                           core_flexible_motif_score_margin=0.2,  # For flexible motifs
-                           cpu_count=1):
+                           core_flexible_motif_score_margin=0.2,
+                           max_candidates=150
+                           ):
     """
-    Full pipeline to identify fixed-position core motifs and then position-independent motifs
-    (from a list of patterns) in the remaining sequences (with context for flexible search).
+    Full pipeline to identify fixed-position core motifs and then
+    position-independent motifs in the remaining sequences.
+
+    Flexible candidates are pruned with the two-way filter_redundant_patterns
+    after each pattern, then rescored on unique hits over the full
+    log2fc_series. Sequences carrying a fixed-position core motif are included
+    in the rescoring on purpose: fixed motifs at the sequence ends are often a
+    flexible motif straddling the library context (e.g. JJ1886's GTG at
+    position 0 is ATACNNNNGTG with ATAC in the left context).
+
+    Args:
+        max_candidates (int): Safety limit on the number of candidate flexible
+            motifs before entering the O(N²) update_motif_scores_from_unique_hits
+            step.  If more candidates are found the function aborts that step,
+            prints guidance on tightening thresholds, and returns the raw
+            (unfiltered) candidates so the caller can inspect them.
+            Default: 150.
     """
     print("--- Starting Fixed-Position Motif Analysis (on original short sequences) ---")
     depleted_fixed_motifs_df = identify_depleted_motifs_scanning_ends(
@@ -988,79 +817,86 @@ def find_restricted_motifs_mp(log2fc_series,
         return core_fixed_motifs_df, flexible_motifs_results_df
 
     short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
-    sequences_with_context_for_flex = get_lib_seq_context(
+    encoded_library_for_flex = encode_library(get_lib_seq_context(
         short_sequences_for_flex_analysis,
         left_context_str,
         right_context_str
-    )
+    ))
     fc_values_for_flexible_analysis = log2fc_series_for_flexible_analysis.tolist()
-    del log2fc_series_for_flexible_analysis # Free memory
+    del log2fc_series_for_flexible_analysis
 
-    # Ensure flexible_motif_patterns is a list
+    cumulative_flexible_motifs_df = pd.DataFrame()
+
     if not isinstance(flexible_motif_patterns, list):
         print("Warning: flexible_motif_patterns should be a list. Wrapping it in a list.")
         flexible_motif_patterns = [flexible_motif_patterns]
 
-    # Sorting the patterns by complexity (defined positions and spacer length)
-    flexible_motif_patterns = sorted(flexible_motif_patterns, key=lambda x: (x[0] + x[2], x[1]))
+    flexible_motif_patterns = sorted(flexible_motif_patterns, key=lambda x: (x[0]+x[2], x[1]))
 
-    # --- Parallelization starts here ---
-    print(f"Parallelizing flexible motif analysis across {len(flexible_motif_patterns)} patterns...")
+    for current_flex_pattern in tqdm(flexible_motif_patterns):
 
-    # Determine number of processes to use
-    # It's often good practice to leave one core free for system processes
-    num_processes = cpu_count
-    print(f"Using {num_processes} processes for parallel analysis.")
-
-    # Create a partial function to fix common arguments for _process_single_flexible_pattern
-    # This makes it compatible with Pool.map or passing a single tuple to starmap
-    partial_process_pattern = functools.partial(
-        process_single_flexible_pattern,
-        sequences_with_context_for_flex=sequences_with_context_for_flex,
-        fc_values_for_flexible_analysis=fc_values_for_flexible_analysis,
-        flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-        flexible_motif_score_thr=flexible_motif_score_thr,
-        flexible_motif_min_support=flexible_motif_min_support
-    )
-
-    all_pattern_results = []
-    # Use tqdm for a progress bar with multiprocessing
-    with Pool(processes=num_processes) as pool:
-        # Use imap_unordered for results to come in as they are ready,
-        # which is useful with tqdm and when order doesn't strictly matter for intermediate steps
-        for result_df in tqdm(pool.imap_unordered(partial_process_pattern, flexible_motif_patterns),
-                              total=len(flexible_motif_patterns),
-                              desc="Processing flexible patterns"):
-            if not result_df.empty:
-                all_pattern_results.append(result_df)
-
-    # Combine all results from parallel processing
-    cumulative_flexible_motifs_df = pd.concat(all_pattern_results, ignore_index=True) if all_pattern_results else pd.DataFrame()
-
-    # --- Continue with the rest of your original logic for filtering and final results ---
-    if not cumulative_flexible_motifs_df.empty:
-        print(f"Found {len(cumulative_flexible_motifs_df)} candidate(s) from all patterns. Filtering against redundancies...")
-        cumulative_flexible_motifs_df = filter_redundant_patterns(
-            cumulative_flexible_motifs_df,
-            score_margin=core_flexible_motif_score_margin,
+        filtered_for_this_pattern = process_single_flexible_pattern(
+            current_flex_pattern,
+            encoded_library_for_flex,
+            fc_values_for_flexible_analysis,
+            flexible_motif_log2fc_thr,
+            flexible_motif_score_thr,
+            flexible_motif_min_support
         )
-        print(f"  -> {len(cumulative_flexible_motifs_df)} core motifs remain after filtering.")
-        # print(cumulative_flexible_motifs_df) # Uncomment to see intermediate results
+
+        if not filtered_for_this_pattern.empty:
+            print(f"Found hits with pattern: {current_flex_pattern}")
+            print(filtered_for_this_pattern)
+            print(f"Found {len(filtered_for_this_pattern)} candidate(s) for pattern {current_flex_pattern}. Filtering against previous results...")
+
+            combined_before_filtering = pd.concat([cumulative_flexible_motifs_df, filtered_for_this_pattern], ignore_index=True)
+
+            cumulative_flexible_motifs_df = filter_redundant_patterns(
+                combined_before_filtering,
+                score_margin=core_flexible_motif_score_margin,
+            )
+            print(f"  -> {len(cumulative_flexible_motifs_df)} core motifs remain after filtering.")
+            print(cumulative_flexible_motifs_df)
 
     if cumulative_flexible_motifs_df.empty:
         print(f"\nNo flexible motifs found meeting initial support > {flexible_motif_min_support} and score > {flexible_motif_score_thr} for any provided pattern.")
         flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
     else:
-        print(f"\nIdentified {len(cumulative_flexible_motifs_df)} raw flexible motifs. Now filtering to core flexible motifs...")
-        print("\nNow filtering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
+        n_candidates = len(cumulative_flexible_motifs_df)
+        print(f"\nIdentified {n_candidates} raw flexible motifs. Now filtering to core flexible motifs...")
 
-        flexible_motifs_results_df = update_motif_scores_from_unique_hits(cumulative_flexible_motifs_df,
-                                                                          log2fc_series,
-                                                                          left_context_str,
-                                                                          right_context_str,
-                                                                          flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-                                                                          flexible_motif_min_support=flexible_motif_min_support,
-                                                                          flexible_motif_score_thr=flexible_motif_score_thr)
+        if n_candidates > max_candidates:
+            warnings.warn(
+                f"\n{'='*70}\n"
+                f"TOO MANY CANDIDATES ({n_candidates} > max_candidates={max_candidates}).\n"
+                f"The unique-hit scoring step is O(N²) per sequence and would run\n"
+                f"effectively forever with this many candidates.\n\n"
+                f"This usually means the thresholds are too permissive for this data.\n"
+                f"Suggestions to reduce candidates:\n"
+                f"  - Increase flexible_motif_log2fc_thr  (currently {flexible_motif_log2fc_thr}, try e.g. -0.8 or -1.0)\n"
+                f"  - Increase flexible_motif_score_thr   (currently {flexible_motif_score_thr}, try e.g. 0.7 or 0.85)\n"
+                f"  - Increase flexible_motif_min_support (currently {flexible_motif_min_support}, try e.g. 5 or 10)\n"
+                f"  - Increase max_candidates if you know what you are doing.\n"
+                f"\nReturning the raw (unfiltered) candidates so you can inspect them.\n"
+                f"{'='*70}",
+                stacklevel=2
+            )
+            print(f"\nTop candidates by fraction_depleted:")
+            print(cumulative_flexible_motifs_df.sort_values('fraction_depleted', ascending=False).head(20).to_string())
+            return core_fixed_motifs_df, cumulative_flexible_motifs_df
+
+        print("\nNow filtering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
+        print(f"(Scoring {n_candidates} candidate motifs — this step is O(N²), may take a moment...)")
+
+        flexible_motifs_results_df = update_motif_scores_from_unique_hits(
+            cumulative_flexible_motifs_df,
+            log2fc_series,
+            left_context_str,
+            right_context_str,
+            flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
+            flexible_motif_min_support=flexible_motif_min_support,
+            flexible_motif_score_thr=flexible_motif_score_thr
+        )
 
         print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
         if flexible_motifs_results_df.empty:
@@ -1071,3 +907,166 @@ def find_restricted_motifs_mp(log2fc_series,
 
     return core_fixed_motifs_df, flexible_motifs_results_df
 
+# %% ../nbs/00_core.ipynb 47
+from multiprocessing import Pool, cpu_count
+import functools # To pass fixed arguments to the parallel function
+
+
+def find_restricted_motifs_mp(log2fc_series,
+                               left_context_str,
+                               right_context_str,
+                               fixed_motif_scan_depth_k=6,
+                               fixed_motif_max_length=4,
+                               fixed_motif_depletion_thr=-1,
+                               fixed_motif_score_thr=0.85,
+                               fixed_motif_min_support=5,
+                               core_motif_score_margin=0.05,
+                               flexible_motif_patterns=[(6, 0, 0), (3, 4, 4)],
+                               flexible_motif_log2fc_thr=-1,
+                               flexible_motif_min_support=3,
+                               flexible_motif_score_thr=0.7,
+                               core_flexible_motif_score_margin=0.2,
+                               cpu_count=1,
+                               max_candidates=150):
+    """
+    Multiprocessing version of find_restricted_motifs: each flexible pattern is
+    scanned in a separate process, then all candidates are filtered together.
+    Results are collected in pattern order, so the output does not depend on
+    which worker finishes first. With the vectorized scan a pattern takes about
+    a second on a 30k-sequence BB2 library, so cpu_count=1 is usually enough.
+
+    Args:
+        max_candidates (int): If more candidates than this remain after
+            filter_redundant_patterns, abort the scoring step and return the
+            raw candidates with threshold-tightening suggestions. Default: 150.
+    """
+    print("--- Starting Fixed-Position Motif Analysis (on original short sequences) ---")
+    depleted_fixed_motifs_df = identify_depleted_motifs_scanning_ends(
+        log2fc_series,
+        scan_depth_k=fixed_motif_scan_depth_k,
+        max_motif_length=fixed_motif_max_length,
+        depletion_threshold=fixed_motif_depletion_thr,
+        score_thr=fixed_motif_score_thr,
+        min_sequence_support=fixed_motif_min_support
+    )
+    core_fixed_motifs_df = filter_to_core_motifs(
+        depleted_fixed_motifs_df,
+        score_improvement_margin=core_motif_score_margin
+    )
+    del depleted_fixed_motifs_df
+
+    if core_fixed_motifs_df.empty:
+        print("No core motifs found at fixed positions.")
+    else:
+        print(f"Found {len(core_fixed_motifs_df)} core motifs at fixed positions:")
+        for _, row in core_fixed_motifs_df.iterrows():
+            print(f"  - Fixed Motif: {row['motif']}, Pos: {row['position']}, Len: {row['length']}, FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
+
+    print("\n--- Starting Position-Independent Motif Analysis on Filtered Sequences (with context) ---")
+    log2fc_series_for_flexible_analysis = filter_sequences_without_core_motifs(
+        log2fc_series,
+        core_fixed_motifs_df
+    )
+    if len(log2fc_series_for_flexible_analysis) == len(log2fc_series):
+        print("No sequences were filtered out based on fixed-position core motifs (or no core motifs found).")
+    else:
+        print(f"Filtered log2fc_series for flexible analysis: {len(log2fc_series_for_flexible_analysis)} sequences remaining.")
+
+    if log2fc_series_for_flexible_analysis.empty:
+        print("No sequences remaining for flexible motif analysis after filtering.")
+        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
+        return core_fixed_motifs_df, flexible_motifs_results_df
+
+    short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
+    encoded_library_for_flex = encode_library(get_lib_seq_context(
+        short_sequences_for_flex_analysis,
+        left_context_str,
+        right_context_str
+    ))
+    fc_values_for_flexible_analysis = log2fc_series_for_flexible_analysis.tolist()
+    del log2fc_series_for_flexible_analysis
+
+    if not isinstance(flexible_motif_patterns, list):
+        print("Warning: flexible_motif_patterns should be a list. Wrapping it in a list.")
+        flexible_motif_patterns = [flexible_motif_patterns]
+
+    flexible_motif_patterns = sorted(flexible_motif_patterns, key=lambda x: (x[0] + x[2], x[1]))
+
+    print(f"Parallelizing flexible motif analysis across {len(flexible_motif_patterns)} patterns...")
+    print(f"Using {cpu_count} processes for parallel analysis.")
+
+    partial_process_pattern = functools.partial(
+        process_single_flexible_pattern,
+        encoded_library=encoded_library_for_flex,
+        fc_values_for_flexible_analysis=fc_values_for_flexible_analysis,
+        flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
+        flexible_motif_score_thr=flexible_motif_score_thr,
+        flexible_motif_min_support=flexible_motif_min_support
+    )
+
+    all_pattern_results = []
+    with Pool(processes=cpu_count) as pool:
+        for result_df in tqdm(pool.imap(partial_process_pattern, flexible_motif_patterns),
+                              total=len(flexible_motif_patterns),
+                              desc="Processing flexible patterns"):
+            if not result_df.empty:
+                all_pattern_results.append(result_df)
+
+    cumulative_flexible_motifs_df = pd.concat(all_pattern_results, ignore_index=True) if all_pattern_results else pd.DataFrame()
+
+    if not cumulative_flexible_motifs_df.empty:
+        print(f"Found {len(cumulative_flexible_motifs_df)} candidate(s) from all patterns. Filtering redundancies...")
+        cumulative_flexible_motifs_df = filter_redundant_patterns(
+            cumulative_flexible_motifs_df,
+            score_margin=core_flexible_motif_score_margin,
+        )
+        print(f"  -> {len(cumulative_flexible_motifs_df)} core motifs remain after filtering.")
+
+    if cumulative_flexible_motifs_df.empty:
+        print(f"\nNo flexible motifs found meeting initial support > {flexible_motif_min_support} and score > {flexible_motif_score_thr} for any provided pattern.")
+        flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
+    else:
+        n_candidates = len(cumulative_flexible_motifs_df)
+        print(f"\nIdentified {n_candidates} raw flexible motifs. Now filtering to core flexible motifs...")
+
+        if n_candidates > max_candidates:
+            warnings.warn(
+                f"\n{'='*70}\n"
+                f"TOO MANY CANDIDATES ({n_candidates} > max_candidates={max_candidates}).\n"
+                f"The unique-hit scoring step is O(N²) per sequence and would run\n"
+                f"effectively forever with this many candidates.\n\n"
+                f"This usually means the thresholds are too permissive for this data.\n"
+                f"Suggestions to reduce candidates:\n"
+                f"  - Increase flexible_motif_log2fc_thr  (currently {flexible_motif_log2fc_thr}, try e.g. -0.8 or -1.0)\n"
+                f"  - Increase flexible_motif_score_thr   (currently {flexible_motif_score_thr}, try e.g. 0.7 or 0.85)\n"
+                f"  - Increase flexible_motif_min_support (currently {flexible_motif_min_support}, try e.g. 5 or 10)\n"
+                f"  - Increase max_candidates if you know what you are doing.\n"
+                f"\nReturning the raw (unfiltered) candidates so you can inspect them.\n"
+                f"{'='*70}",
+                stacklevel=2
+            )
+            print(f"\nTop candidates by fraction_depleted:")
+            print(cumulative_flexible_motifs_df.sort_values('fraction_depleted', ascending=False).head(20).to_string())
+            return core_fixed_motifs_df, cumulative_flexible_motifs_df
+
+        print("\nNow filtering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
+        print(f"(Scoring {n_candidates} candidate motifs — this step is O(N²), may take a moment...)")
+
+        flexible_motifs_results_df = update_motif_scores_from_unique_hits(
+            cumulative_flexible_motifs_df,
+            log2fc_series,
+            left_context_str,
+            right_context_str,
+            flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
+            flexible_motif_min_support=flexible_motif_min_support,
+            flexible_motif_score_thr=flexible_motif_score_thr
+        )
+
+        print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
+        if flexible_motifs_results_df.empty:
+            print("No core flexible motifs remained after filtering.")
+        else:
+            for _, row in flexible_motifs_results_df.iterrows():
+                print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
+
+    return core_fixed_motifs_df, flexible_motifs_results_df

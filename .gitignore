@@ -154,3 +154,6 @@ checklink/cookies.txt
 # Quarto
 .quarto
 llms.txt
+.snakemake/
+results/
+results_test/

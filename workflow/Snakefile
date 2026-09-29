@@ -1,0 +1,179 @@
+"""RandSeq: FASTQ -> counts -> log2FC -> restriction motifs, with QC at every step.
+
+Run:
+    snakemake --profile workflow/profiles/slurm          # on a cluster
+    snakemake --cores 8 --use-conda                      # on one machine
+    snakemake --cores 2 --config samplesheet=workflow/test/samplesheet.csv   # self-test
+
+The samplesheet drives everything. One row per fastq:
+
+    sample,replicate,fastq,role
+    Control,R1,/path/Control_R1.fastq.gz,donor
+    Control,R2,/path/Control_R2.fastq.gz,donor
+    JJ1886,R1,/path/JJ1886_R1.fastq.gz,recipient
+    JJ1886,R2,/path/JJ1886_R2.fastq.gz,recipient
+
+`role` marks which sample is the input library. Library members are discovered **once** from the
+deepest donor replicate and every sample is counted against that one list, so all samples share
+a row universe and are directly comparable.
+"""
+import csv
+from pathlib import Path
+
+configfile: "workflow/config.yaml"
+
+OUT = Path(config["outdir"])
+
+# Software deployment. Once randseq and randcount are published to PyPI/bioconda, set
+# `conda_env: workflow/envs/randseq.yaml` in the config (or on the command line) and run with
+# `--software-deployment-method conda`. Until then the packages are installed by the user and
+# the rules run in whatever environment snakemake was started in.
+CONDA_ENV = config.get("conda_env") or None
+
+
+def conda_env(_):
+    return CONDA_ENV
+
+
+def read_samplesheet(path):
+    rows = []
+    with open(path) as fh:
+        for r in csv.DictReader(fh):
+            missing = {"sample", "replicate", "fastq", "role"} - set(r)
+            if missing:
+                raise ValueError(f"samplesheet {path} is missing columns: {sorted(missing)}")
+            if not Path(r["fastq"]).exists():
+                raise FileNotFoundError(f"samplesheet row {r['sample']}/{r['replicate']}: "
+                                        f"{r['fastq']} does not exist")
+            rows.append(r)
+    if not rows:
+        raise ValueError(f"samplesheet {path} has no rows")
+    if not any(r["role"] == "donor" for r in rows):
+        raise ValueError(f"samplesheet {path} has no row with role=donor; one is required to "
+                         f"discover the library and to normalise against")
+    return rows
+
+
+SAMPLES = read_samplesheet(config["samplesheet"])
+FASTQ = {(r["sample"], r["replicate"]): r["fastq"] for r in SAMPLES}
+UNITS = list(FASTQ)
+REPLICATES = sorted({r["replicate"] for r in SAMPLES})
+DONORS = [r for r in SAMPLES if r["role"] == "donor"]
+RECIPIENTS = sorted({r["sample"] for r in SAMPLES if r["role"] != "donor"})
+DONOR = DONORS[0]["sample"]
+
+# Members are discovered from the largest donor file: the deepest sample sees the most of the
+# library, and a member missed here is missing from every sample.
+DISCOVERY_UNIT = max(((d["sample"], d["replicate"]) for d in DONORS),
+                     key=lambda u: Path(FASTQ[u]).stat().st_size)
+
+
+rule all:
+    input:
+        OUT / "motifs.tsv",
+        OUT / "qc" / "report.txt",
+        expand(str(OUT / "counts" / "{sample}_{rep}.tsv"), zip,
+               sample=[u[0] for u in UNITS], rep=[u[1] for u in UNITS]),
+
+
+rule discover_members:
+    """Build the library member list once, from the deepest donor replicate."""
+    input:
+        fastq=FASTQ[DISCOVERY_UNIT],
+    output:
+        members=OUT / "members.txt",
+    params:
+        left=config["left_flank"],
+        right=config["right_flank"],
+        min_umis=config["discovery_min_umis"],
+        umi_len=config["umi_len"],
+        lo=config["min_insert_len"],
+        hi=config["max_insert_len"],
+    log:
+        OUT / "logs" / "discover.log",
+    shell:
+        "randcount discover {input.fastq} -o {output.members} "
+        "--left {params.left} --right {params.right} --min-umis {params.min_umis} "
+        "--umi-len {params.umi_len} "
+        "--min-insert-len {params.lo} --max-insert-len {params.hi} 2> {log}"
+
+
+rule count:
+    """Count one sample against the shared member list."""
+    input:
+        fastq=lambda w: FASTQ[(w.sample, w.rep)],
+        members=OUT / "members.txt",
+    output:
+        counts=OUT / "counts" / "{sample}_{rep}.tsv",
+        stats=OUT / "qc" / "{sample}_{rep}.json",
+    params:
+        left=config["left_flank"],
+        right=config["right_flank"],
+        umi_len=config["umi_len"],
+        lo=config["min_insert_len"],
+        hi=config["max_insert_len"],
+    log:
+        OUT / "logs" / "count_{sample}_{rep}.log",
+    shell:
+        "randcount count {input.fastq} -m {input.members} -o {output.counts} "
+        "--stats {output.stats} --left {params.left} --right {params.right} "
+        "--umi-len {params.umi_len} "
+        "--min-insert-len {params.lo} --max-insert-len {params.hi} 2> {log}"
+
+
+rule log2fc:
+    """Counts -> log2FC per replicate -> mean across replicates."""
+    input:
+        counts=expand(str(OUT / "counts" / "{sample}_{rep}.tsv"), zip,
+                      sample=[u[0] for u in UNITS], rep=[u[1] for u in UNITS]),
+    output:
+        table=OUT / "log2fc_mean.tsv",
+    params:
+        units=UNITS,
+        donor=DONOR,
+        replicates=REPLICATES,
+        count_threshold=config["count_threshold"],
+    log:
+        OUT / "logs" / "log2fc.log",
+    script:
+        "scripts/log2fc.py"
+
+
+rule find_motifs:
+    """Restriction motifs per recipient, with the confidence statistics."""
+    input:
+        table=OUT / "log2fc_mean.tsv",
+    output:
+        motifs=OUT / "motifs.tsv",
+        skipped=OUT / "motifs_skipped.tsv",
+    params:
+        left=config["left_flank"],
+        right=config["right_flank_context"],
+        recipients=RECIPIENTS,
+        log2fc_thr=config["motif_log2fc_thr"],
+        score_thr=config["motif_score_thr"],
+        backbone=config.get("backbone_fasta"),
+    threads: 4
+    log:
+        OUT / "logs" / "find_motifs.log",
+    script:
+        "scripts/find_motifs.py"
+
+
+rule qc_report:
+    input:
+        stats=expand(str(OUT / "qc" / "{sample}_{rep}.json"), zip,
+                     sample=[u[0] for u in UNITS], rep=[u[1] for u in UNITS]),
+        table=OUT / "log2fc_mean.tsv",
+        counts=expand(str(OUT / "counts" / "{sample}_{rep}.tsv"), zip,
+                      sample=[u[0] for u in UNITS], rep=[u[1] for u in UNITS]),
+    output:
+        report=OUT / "qc" / "report.txt",
+    params:
+        units=UNITS,
+        replicates=REPLICATES,
+        r_exclude=config["replicate_r_exclude"],
+    log:
+        OUT / "logs" / "qc.log",
+    script:
+        "scripts/qc_report.py"

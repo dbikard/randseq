@@ -1,0 +1,5 @@
+sample,replicate,fastq,role
+Donor,R1,workflow/test/Donor_R1.fastq.gz,donor
+Donor,R2,workflow/test/Donor_R2.fastq.gz,donor
+TestStrain,R1,workflow/test/TestStrain_R1.fastq.gz,recipient
+TestStrain,R2,workflow/test/TestStrain_R2.fastq.gz,recipient

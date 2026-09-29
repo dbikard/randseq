@@ -1,0 +1,53 @@
+# RandSeq pipeline configuration.
+# Defaults are the published pMin-150N screen. Change the flanks for a different construct.
+
+samplesheet: workflow/samplesheet.csv
+outdir: results
+
+# Leave null to run in the environment snakemake was started in (install randseq and randcount
+# yourself with pip). Set to workflow/envs/randseq.yaml once both are published, and pass
+# --software-deployment-method conda.
+conda_env: null
+
+# --- construct -------------------------------------------------------------------------------
+# Constant sequences flanking the random insert. These are matched exactly, so they must be
+# right: if flanks_found in the QC report is low, suspect these first.
+left_flank: GTCTAGGGCGGCGGTAAAAC
+right_flank: ACTAGAGCACCAGAAGTCT
+# The right flank as used for motif *context* is one base longer than the one used for parsing.
+# Motifs can straddle the junction between insert and vector, so the analysis needs the extra base.
+right_flank_context: ACTAGAGCACCAGAAGTCTA
+umi_len: 10
+
+# Accepted insert lengths. The library is nominally 150 nt; real data is not. Anything outside
+# this range is an indel product and would otherwise be counted as a separate library member.
+min_insert_len: 145
+max_insert_len: 155
+
+# Vector sequence, optional but recommended. A motif already present in the backbone cannot be
+# detected, because every plasmid carries it and there is no motif-free baseline. With this set,
+# such motifs are flagged instead of silently producing a negative result.
+backbone_fasta: null
+
+# --- library discovery -----------------------------------------------------------------------
+# Molecules required before an insert is called a real library member. Deliberately permissive:
+# rare members are the hits in a depletion screen, and spurious ones are removed later by
+# count_threshold.
+discovery_min_umis: 3
+
+# --- analysis --------------------------------------------------------------------------------
+# Minimum molecules in the donor for a plasmid to enter the analysis. Tune this to your depth:
+# the published screen used 10. A higher threshold means fewer, better-measured plasmids.
+# It does not bias which motifs are called -- depletion is independent of plasmid abundance --
+# but it does set `n_plasmids`, so always report the two together.
+count_threshold: 10
+
+# Motif calling. These were tuned on Enterobacteriaceae RM systems. BREX is weaker and needs
+# -0.5; see the paper. Report the thresholds alongside any call.
+motif_log2fc_thr: -1.0
+motif_score_thr: 0.5
+
+# --- QC --------------------------------------------------------------------------------------
+# The published screen treated strains at or below this replicate correlation as contaminated
+# and excluded them.
+replicate_r_exclude: 0.75

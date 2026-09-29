@@ -279,8 +279,9 @@ def filter_to_core_motifs(depleted_motifs_df,
 
     Args:
         depleted_motifs_df (pd.DataFrame): DataFrame from identify_depleted_motifs_scanning_ends.
-        score_improvement_margin (float): A longer motif's 'fraction_depleted' must be
-                                          greater than the core motif's score by this margin.
+        score_improvement_margin (float): how much better a longer motif's 'fraction_depleted'
+                                          must be than the core motif's before the extra base is
+                                          treated as part of the site.
 
     Returns:
         pd.DataFrame: A filtered DataFrame containing potentially core motifs.
@@ -311,9 +312,13 @@ def filter_to_core_motifs(depleted_motifs_df,
             if core_len < candidate_len and core_motif in candidate_motif:    
                 relative_start = candidate_motif.find(core_motif)
                 if candidate_pos + relative_start == core_pos:
-                    significantly_better_score = candidate_score >= core_score - score_improvement_margin
-                        
-                    if significantly_better_score:
+                    # Keep the longer motif only if the extra base earns its place, i.e.
+                    # if it raises the depletion fraction by more than the margin. If it
+                    # does not, the extra base is not part of the recognition site and the
+                    # shorter core is the real motif.
+                    earns_its_place = candidate_score > core_score + score_improvement_margin
+
+                    if not earns_its_place:
                         is_subsumed = True
                         break 
         

@@ -1036,11 +1036,29 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
         out["q_value"] = benjamini_hochberg(p)
     out["called"] = out["q_value"] < q_threshold
 
-    bimo = []
-    for motif in out["motif"]:
-        sel = _get_filter_for_motif(log2fc_series, motif, left_context, right_context)
-        bimo.append(bimodality_coefficient(log2fc_series[sel.to_numpy()].to_numpy()))
-    out["bimodality"] = bimo
+    # Presence comes from the window codes, not a regex per sequence -- the same vectorized
+    # path the rest of the pipeline uses. Motifs the fast path cannot encode fall back.
+    motifs = out["motif"].tolist()
+    if "pattern" in out.columns:
+        patterns = []
+        for pat in out["pattern"]:
+            try:
+                patterns.append(tuple(ast.literal_eval(pat)) if isinstance(pat, str) else tuple(pat))
+            except (ValueError, SyntaxError):
+                patterns.append(None)
+    else:
+        patterns = [None] * len(motifs)
+
+    encoded = encode_library(
+        get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
+    presence, handled = motif_presence_matrix(encoded, motifs, patterns)
+    for j in np.flatnonzero(~handled):
+        presence[:, j] = _get_filter_for_motif(
+            log2fc_series, motifs[j], left_context, right_context).to_numpy()
+
+    values = log2fc_series.to_numpy()
+    out["bimodality"] = [bimodality_coefficient(values[presence[:, j]])
+                         for j in range(len(motifs))]
     out["bimodal"] = out["bimodality"] > BIMODALITY_BENCHMARK
 
     return out.sort_values(["called", "q_value"], ascending=[False, True])

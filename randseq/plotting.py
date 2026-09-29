@@ -13,7 +13,6 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
-from .core import find_restricted_motifs
 from .utils import calculate_log2fc, get_motif_filter_with_context, get_custom_motif_presence_in_library
 
 # %% ../nbs/02_plotting.ipynb #8d97e736

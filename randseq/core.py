@@ -1,4 +1,4 @@
-"""Fill in a module description here
+"""Finding the DNA motifs a strain restricts, from a table of plasmid counts before and after delivery.
 
 Docs: https://dbikard.github.io/randseq/core.html.md"""
 
@@ -14,15 +14,13 @@ __all__ = ['get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends'
 # %% ../nbs/00_core.ipynb #ef76c820
 import pandas as pd
 from tqdm import tqdm
-import re
 import numpy as np
 import os
 import warnings
+import functools
+from multiprocessing import Pool, cpu_count
 from collections import  defaultdict
 import re
-from random import choice
-from itertools import groupby, chain
-from operator import itemgetter
 from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, find_broad_in_specific, _get_filter_for_motif, canonical_motif
 from typing import List, Tuple, Set, Callable
 
@@ -55,8 +53,10 @@ def get_sites_in_seq(
     represents a defined base (A, T, G, C) and N represents an undefined base in the motif.
 
     Args:
-        sequence_library: A list of DNA sequence strings. All sequences are expected
-                          to be of the same length.
+        sequence_library: A list of DNA sequence strings. They do NOT have to be the same
+                          length -- real libraries are ragged (in the published screen only
+                          ~91% of inserts were exactly the nominal 150 nt). The pattern is
+                          only required to fit inside the shortest one.
         pattern: A tuple of three non-negative integers:
             1. The number of defined bases in the first part of the site.
             2. The length of the spacer (undefined bases) in the middle.
@@ -74,7 +74,6 @@ def get_sites_in_seq(
 
     Raises:
         ValueError: If the sequence library is empty.
-        ValueError: If sequences in the library are not all of the same length.
         ValueError: If the pattern is not a tuple of three non-negative integers.
         ValueError: If the total length of the site defined by the pattern is zero.
         ValueError: If the total length of the site pattern exceeds the length of the
@@ -82,11 +81,6 @@ def get_sites_in_seq(
     """
     # --- Input Validation ---
     if not sequence_library:
-        raise ValueError("Sequence library cannot be empty.")
-
-    try:
-        first_seq_len = len(sequence_library[0])
-    except IndexError: # Should be caught by the above, but for safety
         raise ValueError("Sequence library cannot be empty.")
 
     if not (
@@ -287,8 +281,6 @@ def filter_to_core_motifs(depleted_motifs_df,
         depleted_motifs_df (pd.DataFrame): DataFrame from identify_depleted_motifs_scanning_ends.
         score_improvement_margin (float): A longer motif's 'fraction_depleted' must be
                                           greater than the core motif's score by this margin.
-        fc_improvement_margin (float): A longer motif's 'avg_log2fc' must be lower
-                                       than the core motif's avg_log2fc by this margin.
 
     Returns:
         pd.DataFrame: A filtered DataFrame containing potentially core motifs.
@@ -794,8 +786,6 @@ def _canonicalise_flexible_motifs(df):
     return df
 
 # %% ../nbs/00_core.ipynb #e7d6ec42
-import warnings
-
 def find_restricted_motifs(log2fc_series,
                            left_context_str,
                            right_context_str,
@@ -950,10 +940,6 @@ def find_restricted_motifs(log2fc_series,
     return core_fixed_motifs_df, _canonicalise_flexible_motifs(flexible_motifs_results_df)
 
 # %% ../nbs/00_core.ipynb #aa1c8f82
-from multiprocessing import Pool, cpu_count
-import functools # To pass fixed arguments to the parallel function
-
-
 def find_restricted_motifs_mp(log2fc_series,
                                left_context_str,
                                right_context_str,

@@ -36,7 +36,7 @@ JJ1886 = dict(
     # motif -> (fraction_depleted, num_sequences, avg_log2fc)
     expected={
         "GGTCTC": (1.0, 6, -3.750094),
-        "CACNNNNGTAC": (1.0, 6, -4.922717),
+        "CACNNNNGTAC": (1.0, 3, -4.800833),
         "ATACNNNNGTG": (1.0, 146, -4.744952),
         "AAAGNNNNGTT": (1.0, 54, -5.018200),
     },
@@ -54,9 +54,9 @@ S12049 = dict(
     score_thr=0.5,
     expected={
         "GGTCTC": (0.938776, 49, -2.768577),
-        "ATACNNNNGTG": (1.0, 97, -3.220028),
-        "CACNNNNGTAC": (1.0, 78, -3.258632),
-        "AAAGNNNNGTT": (0.994233, 867, -3.372092),
+        "ATACNNNNGTG": (1.0, 77, -3.226896),
+        "CACNNNNGTAC": (1.0, 66, -3.246736),
+        "AAAGNNNNGTT": (0.994226, 866, -3.370982),
     },
     expected_fixed={("CTTT", 4): 242},
 )
@@ -140,7 +140,7 @@ def test_deterministic_across_hash_seeds(seed, tmp_path):
             f"{m},{v[0]},{v[1]},{v[2]:.6f}"
             for m, v in [
                 ("GGTCTC", (1.0, 6, -3.750094)),
-                ("CACNNNNGTAC", (1.0, 6, -4.922717)),
+                ("CACNNNNGTAC", (1.0, 3, -4.800833)),
                 ("ATACNNNNGTG", (1.0, 146, -4.744952)),
                 ("AAAGNNNNGTT", (1.0, 54, -5.018200)),
             ]

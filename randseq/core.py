@@ -159,6 +159,13 @@ def get_sites_in_seq(
 def score(FCs, thr=-1):
     """
     Returns the fraction of sequences depleted below the thr value.
+
+    Threshold convention, applied consistently across the package and matching the recommended
+    operating thresholds in the paper ("log2FC < -1; depletion score >= 0.5"):
+
+    - a log2FC threshold is **strict**: a plasmid is depleted when ``log2FC < thr``
+    - a score or support threshold is **inclusive**: ``>= thr``, so ``min_support=3`` means
+      three supporting sequences, not four
     Handles empty lists of FCs by returning 0.
     """
     if len(FCs)==0:  # Check if the list is empty
@@ -267,7 +274,7 @@ def identify_depleted_motifs_scanning_ends(log2fc_series,
         by=['fraction_depleted', 'avg_log2fc', 'num_sequences'],
         ascending=[False, True, False]
     )
-    results_df = results_df.loc[results_df['fraction_depleted'] > score_thr]
+    results_df = results_df.loc[results_df['fraction_depleted'] >= score_thr]
     return results_df
 
 # %% ../nbs/00_core.ipynb #b9dc539f
@@ -568,7 +575,7 @@ def process_single_flexible_pattern(
 ):
     """
     Scores all motifs of one flexible pattern and keeps the candidates with
-    fraction_depleted > flexible_motif_score_thr and num_sequences > flexible_motif_min_support.
+    fraction_depleted >= flexible_motif_score_thr and num_sequences >= flexible_motif_min_support.
 
     Args:
         current_flex_pattern (tuple): (d1, spacer, d2) motif pattern.
@@ -585,8 +592,8 @@ def process_single_flexible_pattern(
     scores = get_pattern_scores(encoded_library, fc_values_for_flexible_analysis,
                                 current_flex_pattern, log2FC_thr=flexible_motif_log2fc_thr)
     scores['pattern'] = str(current_flex_pattern)
-    return scores[(scores['fraction_depleted'] > flexible_motif_score_thr) &
-                  (scores['num_sequences'] > flexible_motif_min_support)]
+    return scores[(scores['fraction_depleted'] >= flexible_motif_score_thr) &
+                  (scores['num_sequences'] >= flexible_motif_min_support)]
 
 # %% ../nbs/00_core.ipynb #e40b436f
 def filter_redundant_patterns(df, score_margin=0.05):
@@ -734,7 +741,7 @@ def update_motif_scores_from_unique_hits(
     df_updated['avg_log2fc'] = metrics_df['avg_log2fc']
 
     final_df = df_updated[
-        (df_updated['avg_log2fc'] <= flexible_motif_log2fc_thr) &
+        (df_updated['avg_log2fc'] < flexible_motif_log2fc_thr) &
         (df_updated['num_sequences'] >= flexible_motif_min_support) &
         (df_updated['fraction_depleted'] >= flexible_motif_score_thr)
     ]

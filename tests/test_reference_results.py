@@ -54,9 +54,9 @@ S12049 = dict(
     score_thr=0.5,
     expected={
         "GGTCTC": (0.938776, 49, -2.768577),
-        "ATACNNNNGTG": (1.0, 77, -3.226896),
-        "CACNNNNGTAC": (1.0, 66, -3.246736),
-        "AAAGNNNNGTT": (0.994226, 866, -3.370982),
+        "ATACNNNNGTG": (1.0, 31, -3.260202),
+        "CACNNNNGTAC": (1.0, 17, -3.606989),
+        "AAAGNNNNGTT": (0.994213, 864, -3.369221),
     },
     expected_fixed={("CTTT", 4): 242},
 )

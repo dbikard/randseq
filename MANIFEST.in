@@ -1,6 +1,6 @@
 include LICENSE
 include CONTRIBUTING.md
 include README.md
-recursive-include randseq/example_data *.csv *.csv.gz
+recursive-include randseq/example_data *.csv.gz
 recursive-include randseq/data *.txt
 recursive-exclude * __pycache__

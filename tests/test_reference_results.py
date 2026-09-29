@@ -23,8 +23,8 @@ from randseq.example_data import get_example_data_dir
 TOL = 1e-6
 
 JJ1886 = dict(
-    file="countsTable.csv",
-    seq_col="Unnamed: 0",
+    file="countsTable.csv.gz",
+    seq_col="seq",
     sample="JJ1886_T0",
     reference="MFDpir",
     left="GTCCTAGGTATAATACTAGT",
@@ -120,7 +120,7 @@ def test_deterministic_across_hash_seeds(seed, tmp_path):
         "import pandas as pd, os\n"
         "from randseq.core import calculate_log2fc, find_restricted_motifs\n"
         "from randseq.example_data import get_example_data_dir\n"
-        "df = pd.read_csv(os.path.join(get_example_data_dir(), 'countsTable.csv')).set_index('Unnamed: 0')\n"
+        "df = pd.read_csv(os.path.join(get_example_data_dir(), 'countsTable.csv.gz')).set_index('seq')\n"
         "l = calculate_log2fc(df[['MFDpir','JJ1886_T0']], reference_column='MFDpir')['JJ1886_T0']\n"
         "_, flex = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
         "    flexible_motif_patterns=[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)],\n"

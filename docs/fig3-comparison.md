@@ -9,10 +9,18 @@ same 21-strain panel run through the current `eren` branch. Same input
 
 **Nothing in the biology changes.** All 11 strains that call motifs call *exactly the same set*.
 No motif gained, none lost. `avg_log2fc` — the colour of every heatmap cell — moves by at most
-0.12, and mostly by under 0.03.
+0.10, and mostly by under 0.03.
 
-What changes is that the table stops containing 344 rows of junk, 17 motif labels move to the
-canonical strand, and some support counts move for a reason worth understanding.
+What changes:
+
+- the table stops containing 344 rows of junk from one strain
+- 17 motif labels move to the canonical strand
+- support counts rise, often ten-fold, because redundant descriptions of one site were
+  destroying each other's evidence
+- every call gains a q-value against its own sample's noise, and a shape check
+
+All 30 calls are significant, q = 0 to 9×10⁻⁴². One row is flagged for shape and is worth a
+second look.
 
 ## 1. 381A stops silently poisoning the table
 
@@ -47,65 +55,67 @@ only one should be reported. Which one used to depend on scan order. This also r
 manuscript calling one site `GAGACC` (BsaI) in Results §2 and `GGTCTC` (Eco31I) in §3 — they are
 isoschizomers.
 
-## 3. Support counts move — and 11 of 30 do not move at all
+## 3. Support counts move — upwards, often ten-fold
 
 `num_sequences` counts plasmids carrying **exactly one** candidate motif; a plasmid carrying two
-cannot say which one depleted it, so it is excluded from both. That makes the count a property
-of the whole candidate set, and how stable it is depends on how much competition a motif has:
+cannot say which one depleted it, so it is excluded from both. Several descriptions of the same
+site therefore annihilate each other, and a real motif could be left with a handful of plasmids
+out of hundreds that contain it.
 
-| strain | motif | contains | counted | retained | change |
-|---|---|---|---|---|---|
-| 8097 | `CGACNNNNNNNATTA` | 138 | 138 | **100%** | unchanged |
-| 16226 | `AAAGNNNNGTT` | 897 | 895 | **99.8%** | 659 → 895 |
-| 15846 | `GGTCTC` | 54 | 47 | 87% | unchanged |
-| 15846 | `ATACNNNNGTG` | 484 | 16 | **3.3%** | 57 → 16 |
-| 15846 | `CACNNNNGTAC` | 460 | 6 | **1.3%** | 53 → 6 |
+A filter now removes a candidate whose depletion a stronger candidate already explains (see §4),
+before the counting happens. The support that was being destroyed comes back:
 
-Where retention is high the count is a real measure of evidence and it barely moves. Where it is
-1–3%, the count is a small residual of a large number, and any change to the candidate set swings
-it. **53 and 6 are both residuals of 460; neither is more correct than the other.**
+| strain | motif | n before | n after |
+|---|---|---|---|
+| 16171 | `AAACNNNNGTC` | 127 | **847** |
+| 16171 | `ACANNNNNATGG` | 42 | **494** |
+| 15846 | `ATACNNNNGTG` | 57 | **449** |
+| 15846 | `CACNNNNGTAC` | 53 | **421** |
+| 15852 | `ATACNNNNGTG` | 91 | **461** |
+| 15853 | `CACNNNNGTAC` | 85 | **421** |
 
-## 4. Why those particular motifs have so much competition
+**Eleven of thirty are completely unchanged** — every motif in 7083, 7084, 8097, 16175 and 16169.
+Those are the strains with few, well-separated motifs, which never had redundant descriptions to
+remove. The change touches only what it should.
 
-Not what we first assumed. Every motif competing with `CACNNNNGTAC` in LMR_503 turns out to be
-*the same site at the same spacing*, over-specified:
+`avg_log2fc` moves by at most 0.10 throughout, and mostly by under 0.03.
+
+## 4. Why those motifs had so much competition
+
+Every candidate crowding out `CACNNNNGTAC` in LMR_503 is *the same site at the same spacing*,
+over-specified:
 
 | competitor | decomposes as |
 |---|---|
 | `CACNNNNGTAC` | `CAC-NNNN-GTA` + `C` |
 | `TACNNNNGTGG` | `C` + `CAC-NNNN-GTA` |
 | `CACTNNAGTA` | `CAC-TNNA-GTA` |
-| `CACANNGGTA` | `CAC-ANNG-GTA` |
 | `ACACNNNAGTA` | `A` + `CAC-NNNA-GTA` |
 
-All spacer 4. They differ only by pinning one extra base outside the site, or bases inside the
-spacer. A plasmid matching one necessarily matches several, so eight descriptions of one site
-annihilate each other in the unique-hit step.
+All spacer 4. They differ only by pinning an extra base outside the site or inside the spacer,
+and crucially **none of them constrains the final `Y`**. The real site is `CACNNNNGTAY`; drop the
+`Y` and roughly half the matches are at uncut positions, so each of these scores just over the
+0.5 threshold on borrowed signal. Score tracked "fraction of its plasmids that carry the real
+site" almost exactly 1:1 across all 24 candidates.
 
-That the spacing is what matters was checked directly. Holding the half-sites fixed and varying
+That the spacing is what matters was checked directly — holding the half-sites fixed and varying
 only the spacer:
 
-| spacer | `CAC-Nx-GTA` median log2FC | `AAAG-Nx-GTT` median log2FC |
+| spacer | `CAC-Nx-GTA` median log2FC | `AAAG-Nx-GTT` |
 |---|---|---|
 | 0–3 | −0.03 to −0.06 | −0.00 to −0.04 |
-| **4** | **−1.81** (53% depleted) | **−3.09** (99.6% depleted) |
+| **4** | **−1.81** | **−3.09** |
 | 5–8 | −0.02 to −0.07 | −0.00 to −0.02 |
 
-Baseline over all plasmids is −0.013, so every other spacing is at background — a knife-edge, as
-Type I biology predicts. Controls hold: EDL933 ΔRM is flat at every spacing, and a scrambled 5′
-half-site in the same strain is flat too.
+Baseline over all plasmids is −0.013, so every other spacing is at background. Controls hold:
+EDL933 ΔRM is flat at every spacing, and a scrambled 5′ half-site in the same strain is flat too.
 
-**The redundancy filter cannot fix this as designed.** The natural broad motif is `CACNNNNGTA`,
-but the real site is degenerate at the last position (`CACNNNNGTAY`), so `CACNNNNGTA` also matches
-uncut sites and its score is roughly halved (0.52 against 1.00 for the specifics). The filter
-drops a specific motif only when the general one is *not significantly worse* — and here it
-genuinely is worse. The filter is behaving correctly; the design has no way to say "these eight
-are one site with a degenerate position".
-
-`find_iupac_equivalent_motifs` is exactly the right tool, and it already exists — but it runs
-downstream in Bea's script, **after** the rescoring. Merging before rescoring would make these one
-candidate instead of eight competitors. That is a design change with biological judgement in it
-and has not been made.
+The string-based redundancy filter cannot collapse these, and is right not to: the natural
+general motif `CACNNNNGTA` also matches uncut sites and scores about half as well, so the rule
+"drop the specific only when the general is not significantly worse" correctly declines. The new
+filter compares **plasmid sets** instead of strings, and asks whether a candidate still depletes
+the plasmids that do *not* carry the stronger one. It introduces no threshold — it re-applies the
+score threshold the candidate already had to pass.
 
 ## 5. The old numbers were not reproducible anyway
 
@@ -126,6 +136,53 @@ The same 21-strain panel: **1 h 45 min** on the old package, minutes on the new 
 RM-deficient strain used to be the *slow* case — nothing real to find means hundreds of
 near-threshold candidates entering a quadratic step — which is exactly what a new lab runs first.
 
+## 7. New information: significance and shape
+
+Every call now carries a q-value computed against **that sample's own background depletion
+rate**, corrected over every motif the scan tested (~750,000). This is information that did not
+exist before, and it is what makes a low-n result interpretable.
+
+All 30 calls in the panel are significant, from q = 0 down to q = 9×10⁻⁴². Nothing in Fig 3 is
+marginal.
+
+### The background rate is the most diagnostic number about a sample
+
+It varies 20-fold across the panel, and it changes what a *negative* result means:
+
+| strain | background | calls |
+|---|---|---|
+| 8099 | 0.015 | none |
+| 16225 | 0.021 | none |
+| 8097 | 0.018 | 2 |
+| … | | |
+| 16164 | 0.108 | none |
+| 16165 | 0.125 | none |
+| 8098 | 0.144 | none |
+| **16223 (381A)** | **0.335** | 1, plus 13 below threshold |
+
+"No motif found" in 8099 (background 0.015) is a strong negative. The same statement for 8098
+(0.144) is much weaker — nearly a seventh of that library is depleted for reasons unrelated to
+any motif, so a real weak system could be hidden. Neither was distinguishable before.
+
+For 381A the number explains what was previously a judgement call: a third of its library is
+depleted, its one real call sits at q = 3×10⁻⁷⁵, and its other thirteen candidates fall between
+q = 0.36 and 0.93. Its library bottleneck is visible in the statistics rather than asserted.
+
+### Shape: one population or two
+
+A real site shifts one population; a motif that is really a diluted version of another is a
+mixture of destroyed and untouched plasmids. Sarle's bimodality coefficient separates them at the
+conventional 5/9 ≈ 0.556 benchmark — shadows measured 0.647–0.667, every real call 0.19–0.47,
+with BREX at 0.236 despite having the broadest distribution of any real call.
+
+**One call in the panel is flagged:** `CAACNNNNNTCGG` in 7083, at 0.569 — marginally over the
+line. Its partner `CAATNNNNNTCGG` sits at 0.468, and the two differ only at one position, so the
+site is presumably `CAAYNNNNNTCGG` and both halves are real. This looks like a borderline flag
+rather than a problem, but it is the one row in Fig 3 worth a second look.
+
+Significance and shape catch different failures and neither subsumes the other: a shadow of a
+real site is *highly* significant and bimodal; a chance call is neither.
+
 ## What Bea needs to do
 
 1. **Add `try/except TooManyCandidatesError`** to `generate_fig3_motifs.py`, or it dies on 16223
@@ -135,15 +192,16 @@ near-threshold candidates entering a quadratic step — which is exactly what a 
    than assuming.
 3. Expect **IUPAC-merged names to change spelling** in `..._iupac_merged_mm2.csv` even where the
    grouping does not.
-4. **Do not quote a bare `n=`.** The Results §2 placeholders need the threshold stated with them,
-   and for bipartite motifs the retention (`6 of 460`) matters more than the count.
+4. **The `n=` placeholders in Results §2 can now be filled** — support counts are no longer a
+   small residual of a large number, and every call carries a q-value to quote beside it.
 5. Correct Results §2 `GAGACC` to `GGTCTC` to match §3.
 
 ## Reproducing this
 
 - `work/run_fig3_arm.py` — the panel under whichever `randseq` is on `sys.path`
 - `work/compare_fig3.py` — the diff against her committed table
-- `work/why_counts_fall2.py` — the retention analysis
+- `work/why_counts_fall2.py`, `work/competitor_scores.py`, `work/explained_by.py` — §3 and §4
+- `work/permutation_fdr.py`, `work/analytic_null.py` — the calibration behind §6
 - `work/flank_competition.py`, `work/spacer_scan.py`, `work/decompose.py` — section 4
 
 All of it reads her repository and writes nothing to it.

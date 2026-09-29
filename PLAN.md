@@ -223,9 +223,23 @@ Reproducing Fig 3 against the real 21-strain panel settled three things the plan
    move — confirm with the harness.
 5. ~~`max_candidates` raises an error.~~ **Done**: `TooManyCandidatesError`, with the candidate
    table attached as `.candidates`.
-6. Experiment, reported but not adopted (decision 4): repeat the unique-hit rescoring until no
-   more motifs are dropped; record whether it changes either dataset, and write the answer here.
-   Best done after 0.2, so the fixture can say which answer is right.
+6. ~~Experiment, reported but not adopted (decision 4): repeat the unique-hit rescoring.~~
+   **Done, 2026-09-29. Answer: it converges immediately but inflates support enormously, and
+   must not be adopted.**
+
+   Rescoring recomputes each motif's statistics using only plasmids that carry exactly one
+   candidate, then drops motifs that no longer pass. Dropping a motif frees its plasmids to
+   count as "unique" for the survivors, so the step can be iterated. Measured on four strains:
+
+   - the **motif set is identical at every iteration** -- iterating never finds or loses a motif
+   - the **statistics converge at iteration 2** and do not move again
+   - but they converge to a far more permissive answer. On 12049, `CACNNNNGTAC` goes from
+     n=17 to n=441 and `CACNNNNGTAT` from 31 to 483; on JJ1886 `GTACNNNNGTG` goes from 3 to 19
+
+   That is the whole point of the step being undone. Each round re-admits plasmids that were
+   excluded precisely because they carry more than one candidate, so iterating to a fixed point
+   converges on something close to not having excluded them at all. One pass is the intended
+   semantics. Script: `../work/iterative_rescoring.py`.
 
 ## Phase 3: Rewrite the core notebook as a walkthrough (no change to results)
 

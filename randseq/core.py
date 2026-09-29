@@ -8,8 +8,8 @@ Docs: https://dbikard.github.io/randseq/core.html.md"""
 __all__ = ['get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends', 'filter_to_core_motifs',
            'get_fold_change_values_per_site', 'filter_sequences_without_core_motifs', 'get_sites_scores',
            'encode_library', 'decode_motif_codes', 'get_pattern_scores', 'process_single_flexible_pattern',
-           'filter_redundant_patterns', 'update_motif_scores_from_unique_hits', 'find_restricted_motifs',
-           'find_restricted_motifs_mp']
+           'filter_redundant_patterns', 'update_motif_scores_from_unique_hits', 'TooManyCandidatesError',
+           'find_restricted_motifs', 'find_restricted_motifs_mp']
 
 # %% ../nbs/00_core.ipynb #ef76c820
 import pandas as pd
@@ -17,12 +17,13 @@ from tqdm import tqdm
 import re
 import numpy as np
 import os
+import warnings
 from collections import  defaultdict
 import re
 from random import choice
 from itertools import groupby, chain
 from operator import itemgetter
-from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, find_broad_in_specific, _get_filter_for_motif
+from .utils import revcomp, calculate_log2fc, get_lib_seq_context, get_patterns, find_broad_in_specific, _get_filter_for_motif, canonical_motif
 from typing import List, Tuple, Set, Callable
 
 
@@ -743,6 +744,55 @@ def update_motif_scores_from_unique_hits(
 
     return final_df
 
+# %% ../nbs/00_core.ipynb #3bfb4529
+class TooManyCandidatesError(RuntimeError):
+    """Raised when the flexible-motif search produces more candidates than it will score.
+
+    The unfiltered candidate table is available as `.candidates` for inspection. It is **not**
+    a result: these motifs have not been through the unique-hit rescoring that removes
+    co-occurring and redundant sites.
+    """
+
+    def __init__(self, n_candidates, max_candidates, log2fc_thr, score_thr, min_support, candidates):
+        self.n_candidates = n_candidates
+        self.max_candidates = max_candidates
+        self.candidates = candidates
+        super().__init__(
+            f"Too many candidate motifs: {n_candidates} > max_candidates={max_candidates}. "
+            f"The unique-hit scoring step is O(N^2) and would not finish. This usually means the "
+            f"thresholds are too permissive for this data. Try a stricter "
+            f"flexible_motif_log2fc_thr (currently {log2fc_thr}, e.g. -0.8 or -1.0), "
+            f"flexible_motif_score_thr (currently {score_thr}, e.g. 0.7 or 0.85), or "
+            f"flexible_motif_min_support (currently {min_support}, e.g. 5 or 10). "
+            f"Raise max_candidates only if you know why this strain has so many candidates. "
+            f"The unfiltered candidates are on this exception as `.candidates`."
+        )
+
+# %% ../nbs/00_core.ipynb #006a8b89
+def _canonicalise_flexible_motifs(df):
+    """Put every motif in a flexible-motif result table on its canonical strand.
+
+    A motif and its reverse complement have identical statistics, so rewriting the label loses
+    nothing. If both strands of one site somehow survive into the same table they collapse to a
+    single row and a warning is issued, because that means the redundancy filter let a duplicate
+    through.
+    """
+    if df is None or df.empty or 'motif' not in df.columns:
+        return df
+    df = df.copy()
+    df['motif'] = df['motif'].map(canonical_motif)
+    subset = [c for c in ('motif', 'pattern') if c in df.columns]
+    duplicated = df.duplicated(subset=subset)
+    if duplicated.any():
+        dropped = df.loc[duplicated, 'motif'].tolist()
+        warnings.warn(
+            f"Both strands of the same site survived redundancy filtering and have been "
+            f"collapsed: {dropped}. This is a bug in the redundancy filter, not in the data.",
+            stacklevel=2,
+        )
+        df = df[~duplicated]
+    return df
+
 # %% ../nbs/00_core.ipynb #e7d6ec42
 import warnings
 
@@ -816,7 +866,7 @@ def find_restricted_motifs(log2fc_series,
     if log2fc_series_for_flexible_analysis.empty:
         print("No sequences remaining for flexible motif analysis after filtering.")
         flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
-        return core_fixed_motifs_df, flexible_motifs_results_df
+        return core_fixed_motifs_df, _canonicalise_flexible_motifs(flexible_motifs_results_df)
 
     short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
     encoded_library_for_flex = encode_library(get_lib_seq_context(
@@ -868,24 +918,14 @@ def find_restricted_motifs(log2fc_series,
         print(f"\nIdentified {n_candidates} raw flexible motifs. Now filtering to core flexible motifs...")
 
         if n_candidates > max_candidates:
-            warnings.warn(
-                f"\n{'='*70}\n"
-                f"TOO MANY CANDIDATES ({n_candidates} > max_candidates={max_candidates}).\n"
-                f"The unique-hit scoring step is O(N²) per sequence and would run\n"
-                f"effectively forever with this many candidates.\n\n"
-                f"This usually means the thresholds are too permissive for this data.\n"
-                f"Suggestions to reduce candidates:\n"
-                f"  - Increase flexible_motif_log2fc_thr  (currently {flexible_motif_log2fc_thr}, try e.g. -0.8 or -1.0)\n"
-                f"  - Increase flexible_motif_score_thr   (currently {flexible_motif_score_thr}, try e.g. 0.7 or 0.85)\n"
-                f"  - Increase flexible_motif_min_support (currently {flexible_motif_min_support}, try e.g. 5 or 10)\n"
-                f"  - Increase max_candidates if you know what you are doing.\n"
-                f"\nReturning the raw (unfiltered) candidates so you can inspect them.\n"
-                f"{'='*70}",
-                stacklevel=2
+            raise TooManyCandidatesError(
+                n_candidates,
+                max_candidates,
+                flexible_motif_log2fc_thr,
+                flexible_motif_score_thr,
+                flexible_motif_min_support,
+                cumulative_flexible_motifs_df,
             )
-            print(f"\nTop candidates by fraction_depleted:")
-            print(cumulative_flexible_motifs_df.sort_values('fraction_depleted', ascending=False).head(20).to_string())
-            return core_fixed_motifs_df, cumulative_flexible_motifs_df
 
         print("\nNow filtering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
         print(f"(Scoring {n_candidates} candidate motifs — this step is O(N²), may take a moment...)")
@@ -907,7 +947,7 @@ def find_restricted_motifs(log2fc_series,
             for _, row in flexible_motifs_results_df.iterrows():
                 print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
 
-    return core_fixed_motifs_df, flexible_motifs_results_df
+    return core_fixed_motifs_df, _canonicalise_flexible_motifs(flexible_motifs_results_df)
 
 # %% ../nbs/00_core.ipynb #aa1c8f82
 from multiprocessing import Pool, cpu_count
@@ -977,7 +1017,7 @@ def find_restricted_motifs_mp(log2fc_series,
     if log2fc_series_for_flexible_analysis.empty:
         print("No sequences remaining for flexible motif analysis after filtering.")
         flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
-        return core_fixed_motifs_df, flexible_motifs_results_df
+        return core_fixed_motifs_df, _canonicalise_flexible_motifs(flexible_motifs_results_df)
 
     short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
     encoded_library_for_flex = encode_library(get_lib_seq_context(
@@ -1032,24 +1072,14 @@ def find_restricted_motifs_mp(log2fc_series,
         print(f"\nIdentified {n_candidates} raw flexible motifs. Now filtering to core flexible motifs...")
 
         if n_candidates > max_candidates:
-            warnings.warn(
-                f"\n{'='*70}\n"
-                f"TOO MANY CANDIDATES ({n_candidates} > max_candidates={max_candidates}).\n"
-                f"The unique-hit scoring step is O(N²) per sequence and would run\n"
-                f"effectively forever with this many candidates.\n\n"
-                f"This usually means the thresholds are too permissive for this data.\n"
-                f"Suggestions to reduce candidates:\n"
-                f"  - Increase flexible_motif_log2fc_thr  (currently {flexible_motif_log2fc_thr}, try e.g. -0.8 or -1.0)\n"
-                f"  - Increase flexible_motif_score_thr   (currently {flexible_motif_score_thr}, try e.g. 0.7 or 0.85)\n"
-                f"  - Increase flexible_motif_min_support (currently {flexible_motif_min_support}, try e.g. 5 or 10)\n"
-                f"  - Increase max_candidates if you know what you are doing.\n"
-                f"\nReturning the raw (unfiltered) candidates so you can inspect them.\n"
-                f"{'='*70}",
-                stacklevel=2
+            raise TooManyCandidatesError(
+                n_candidates,
+                max_candidates,
+                flexible_motif_log2fc_thr,
+                flexible_motif_score_thr,
+                flexible_motif_min_support,
+                cumulative_flexible_motifs_df,
             )
-            print(f"\nTop candidates by fraction_depleted:")
-            print(cumulative_flexible_motifs_df.sort_values('fraction_depleted', ascending=False).head(20).to_string())
-            return core_fixed_motifs_df, cumulative_flexible_motifs_df
 
         print("\nNow filtering to remove sequences with multiple motifs from the analysis and dropping motifs that no longer pass the thresholds")
         print(f"(Scoring {n_candidates} candidate motifs — this step is O(N²), may take a moment...)")
@@ -1071,4 +1101,4 @@ def find_restricted_motifs_mp(log2fc_series,
             for _, row in flexible_motifs_results_df.iterrows():
                 print(f"{row['motif']} (from pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
 
-    return core_fixed_motifs_df, flexible_motifs_results_df
+    return core_fixed_motifs_df, _canonicalise_flexible_motifs(flexible_motifs_results_df)

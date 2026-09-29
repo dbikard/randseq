@@ -28,3 +28,6 @@ version = {attr = "randseq.__version__"}
 include = ["randseq*"]
 
 [tool.nbdev]
+
+[tool.pytest.ini_options]
+markers = ["slow: reruns the pipeline in subprocesses (determinism check)"]

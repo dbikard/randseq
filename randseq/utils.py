@@ -6,11 +6,12 @@ Docs: https://dbikard.github.io/randseq/utils.html.md"""
 
 # %% auto #0
 __all__ = ['IUPAC_DNA_TO_BASES', 'IUPAC_DNA_TO_REGEX', 'IUPAC_COMPLEMENT', 'bases', 'flatten', 'IUPAC_EXPAND', 'IUPAC_COLLAPSE',
-           'calculate_log2fc', 'revcomp', 'allseqs', 'get_all_sites', 'get_lib_seq_context',
-           'check_specific_matches_broad_iupac', 'check_specific_matches_broad', 'find_broad_in_specific',
-           'get_motif_filter_with_context', 'generate_tuple_combinations', 'filter_symmetric_tuples', 'get_patterns',
-           'create_motif_presence_matrix', 'get_custom_motif_presence_in_library', 'get_log2fc_distribution_by_motif',
-           'motif_distance', 'merge_motifs', 'find_iupac_equivalent_motifs']
+           'calculate_log2fc', 'revcomp', 'get_rebase_motifs', 'canonical_motif', 'allseqs', 'get_all_sites',
+           'get_lib_seq_context', 'check_specific_matches_broad_iupac', 'check_specific_matches_broad',
+           'find_broad_in_specific', 'get_motif_filter_with_context', 'generate_tuple_combinations',
+           'filter_symmetric_tuples', 'get_patterns', 'create_motif_presence_matrix',
+           'get_custom_motif_presence_in_library', 'get_log2fc_distribution_by_motif', 'motif_distance', 'merge_motifs',
+           'find_iupac_equivalent_motifs']
 
 # %% ../nbs/01_utils.ipynb #d56a7712
 import pandas as pd
@@ -117,6 +118,51 @@ def revcomp(seq:str):
     '''Computes the reverse complement of a sequence'''
     trns=str.maketrans("ATGCN","TACGN")
     return seq.upper().translate(trns)[::-1]
+
+# %% ../nbs/01_utils.ipynb #04af769a
+_REBASE_MOTIFS = None
+
+def get_rebase_motifs():
+    """The REBASE Gold Standard recognition motifs shipped with the package.
+
+    Returns a `set` of IUPAC motif strings (n=983, downloaded 2025-12-03). Used by
+    `canonical_motif` to decide which strand to report a motif on. Read once and cached.
+    """
+    global _REBASE_MOTIFS
+    if _REBASE_MOTIFS is None:
+        from randseq.data import get_data_dir
+        path = os.path.join(get_data_dir(), 'rebase_gold_standard_motifs.txt')
+        with open(path) as fh:
+            _REBASE_MOTIFS = {line.strip().upper() for line in fh if line.strip()}
+    return _REBASE_MOTIFS
+
+# %% ../nbs/01_utils.ipynb #21042f37
+def canonical_motif(motif, rebase_motifs=None):
+    """Return the strand `motif` should be reported on.
+
+    A motif and its reverse complement describe the same recognition site and always carry the
+    same statistics, so exactly one of them should appear in the results. Prefer the strand that
+    REBASE uses; if REBASE knows neither (or both), fall back to the alphabetically first strand,
+    which is arbitrary but identical on every run.
+
+    Args:
+        motif (str): An IUPAC motif, e.g. `'GAGACC'` or `'CACNNNNGTAT'`.
+        rebase_motifs (set, optional): Motif set to match against. Defaults to
+            `get_rebase_motifs()`. Pass an explicit set to test or to use a different reference.
+
+    Returns:
+        str: `motif` or its reverse complement.
+    """
+    if rebase_motifs is None:
+        rebase_motifs = get_rebase_motifs()
+    motif = motif.upper()
+    rc = revcomp(motif)
+    in_fwd, in_rev = motif in rebase_motifs, rc in rebase_motifs
+    if in_fwd and not in_rev:
+        return motif
+    if in_rev and not in_fwd:
+        return rc
+    return min(motif, rc)
 
 # %% ../nbs/01_utils.ipynb #599cd60c
 bases=list("ATGC")

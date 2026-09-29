@@ -1,0 +1,9 @@
+lab_id,strain,demonstrates
+12049,JJ1886,"three active RM systems, strong clean signal - the worked example"
+11996,CFT073,weak but reproducible depletion that single-plasmid assays missed
+8408,HS,"BREX: mean log2FC about -0.77, invisible at the default -1 threshold"
+15846,LMR_503,four co-occurring motifs spanning -1.31 to -3.26 in one strain
+16171,B156,fixed-position motif GTC@4 IS AAACNNNNGTC formed with the left flank
+16223,381A,"pathological: >150 candidates, trips TooManyCandidatesError"
+12766,EDL933,"wild type, paired with its isogenic RM knockout below"
+12767,EDL933_dRM,isogenic RM knockout - the pipeline must call nothing here

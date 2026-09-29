@@ -4,8 +4,10 @@ Runs the two example datasets at fixed settings and asserts the exact motif tabl
 numbers are the contract: any change to the pipeline that moves them is either a bug or a
 deliberate decision that has to be recorded in CHANGELOG.md.
 
-The two datasets are both E. coli JJ1886 (Lab.ID 12049) from different sequencing runs, so the
-two tables should report the *same motifs* — which is the point of the canonical-strand rule.
+Both datasets are E. coli JJ1886 (Lab.ID 12049) from different sequencing runs — countsTable is
+the earlier run, counts_panel is BB2 — so the two tables must report the *same motifs*. That is
+the point of the canonical-strand rule, and before it they reported every motif on opposite
+strands.
 
 Run with:   python -m pytest tests/test_reference_results.py
 Determinism:  PYTHONHASHSEED=<n> python -m pytest tests/test_reference_results.py
@@ -42,10 +44,10 @@ JJ1886 = dict(
 )
 
 S12049 = dict(
-    file="counts_12049.csv.gz",
+    file="counts_panel.csv.gz",
     seq_col="seq",
-    sample="12049_R1",
-    reference="Control",
+    sample="JJ1886_R1",
+    reference="Control_R1",
     left="GTCTAGGGCGGCGGTAAAAC",
     right="ACTAGAGCACCAGAAGTCTA",
     patterns=None,  # get_patterns()

@@ -1,204 +1,281 @@
 # Plan: clean up randseq and rewrite the core notebook as a walkthrough
 
-Written 2026-09-28, to be picked up in a later session.
+Written 2026-09-28 on a laptop, before the data was available. **Revised 2026-09-29 on the
+Maestro cluster**, after reproducing Fig 3 against the real BB2 panel. The machine rules, the
+reference tables and the phase order all changed; see "What the data changed" below.
 
-## Where things stand
+**Current goal (set by DB, 2026-09-29):** get the package to a state DB is happy with, then hand
+it to Bea so she redoes the manuscript figures with it. Correctness first, ship fast. Scope for
+the handoff is phases 0.1 / 2.2 / 2.5 plus the strand fix — *not* the full cleanup.
 
-- Branch `eren` (pushed, CI green) = Bea's `bea` branch + two commits:
-  - `b758f8f` Merge core_v2 into core; vectorized flexible-motif scan
-  - `1854343` Upgrade to nbdev 3
-- One `core` module. Kept from Bea's core_v2: the two-way `filter_redundant_patterns`, precomputed filters in
-  `update_motif_scores_from_unique_hits`, and `max_candidates`. Reverted: unique-hit rescoring is done on the
-  **full** log2fc series, not only on sequences without fixed-position motifs.
-- Fast scan: `encode_library`, `decode_motif_codes`, `get_pattern_scores` (numpy, motif = integer over its defined
-  bases, stats via `np.bincount`). Identical to the string-based reference on all 43 patterns of both example
-  datasets; the 12049 search takes ~40 s and ~600 MB on one process.
-- nbdev 3.3.24 in the `randseq` conda env: commands use hyphens (`nbdev-export`, `nbdev-test --n-workers 1 --save`,
-  `nbdev-clean`), config lives in `pyproject.toml`.
+## Status at a glance
 
-## Working rules (important on this machine)
+| phase | item | status |
+|---|---|---|
+| 0.1 | regression harness | **done** — `tests/test_reference_results.py`, 6 tests |
+| 0.2 | synthetic fixture | **not done — now the top priority**, see below |
+| 0.3 | slim example data | not done (17 MB still shipped) |
+| 1 | remove dead code | not done (one item done incidentally: `warnings` moved to the top cell) |
+| 2.1 | one pipeline function `n_jobs=` | not done — both functions still exist |
+| 2.2 | order-independence | **partly** — output is deterministic and the strand is canonical; the filter itself is still order-dependent by construction |
+| 2.3 | `filter_to_core_motifs` inversion | not done |
+| 2.4 | strict `<` everywhere | not done |
+| 2.5 | `max_candidates` raises | **done** |
+| 2.6 | iterative-rescoring experiment | not done |
+| 3 | notebook walkthrough | not done |
+| 4 | push + tell Bea | **partly** — `CHANGELOG.md` written; commit `7190691` not yet pushed; Bea not contacted |
+| — | canonical motif strand | **done** (not in the original plan) |
+| — | `core_v2` compat shim | **done** (not in the original plan) |
 
-- WSL has 15 GB RAM and crashed twice from out-of-memory. Run anything heavy inside a memory cap:
-  `systemd-run --user --scope -q -p MemoryMax=4G -p MemorySwapMax=0 <command>`
-- Use the env's executables: `~/anaconda3/envs/randseq/bin/python`, `.../nbdev-test`, etc. The base Anaconda Python
-  has a broken numpy/pyarrow combination.
-- Run notebooks one at a time: `nbdev-test --n-workers 1 --save` executes them and saves outputs.
+One commit ahead of `origin/eren` and unpushed: `7190691`.
 
-## Reference results (must not change in phases 1 and 3)
+## Working rules (Maestro, not WSL)
 
-Default settings of the notebook examples.
+The previous version of this file described a 15 GB WSL box and `systemd-run` memory caps.
+None of that applies. On Maestro:
 
-JJ1886 (`countsTable.csv`, column `JJ1886_T0`, reference `MFDpir`, flanks `GTCCTAGGTATAATACTAGT` /
-`GTTTTAGAGCTAGAAATAGC`, patterns `[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)]`, score threshold 0.7):
+- **This is a SLURM cluster — never run the pipeline on the login node.** `srun` for short
+  checks, `sbatch` for anything longer. The whole 21-strain panel is ~4 min on 4 cores / 32 GB;
+  a single example dataset is 2–15 s. Memory has not been a constraint here, so the memory-cap
+  workaround is gone.
+- **`/local/scratch` is node-local.** A script a compute node must read has to live on shared
+  storage — use `../work/`, not the session scratchpad.
+- **Call env executables by absolute path.** `~/.local/bin` is first on PATH and wins *even
+  inside `conda run -n randseq`*. `~/.local/bin/nbdev-test` is a symlink into another user's
+  venv, so `conda run -n randseq nbdev-test` silently runs the wrong interpreter and fails with
+  a confusing `ModuleNotFoundError`. Use `~/miniconda3/envs/randseq/bin/nbdev-test`,
+  `~/miniconda3/envs/randseq/bin/python -m pytest`, etc. `conda run -n randseq python` *is*
+  safe, because `.local/bin` has no `python`.
+- Env is `randseq` under **miniconda** (`~/miniconda3/envs/randseq`, python 3.11), not anaconda.
+  Install with `python -m pip install -e .` from the repo root — note `.[dev]` does not exist and
+  silently installs nothing.
+- nbdev 3.3.24, hyphenated commands, config in `pyproject.toml`. `nbdev-test --n-workers 1`.
+  `nbs/llms.txt` is generated and gitignored.
 
-| motif | fraction_depleted | num_sequences | avg_log2fc |
-|---|---|---|---|
-| GAGACC | 1.0 | 6 | -3.750094 |
-| GTACNNNNGTG | 1.0 | 6 | -4.922717 |
-| ATACNNNNGTG | 1.0 | 146 | -4.744952 |
-| AAAGNNNNGTT | 1.0 | 54 | -5.018200 |
+## Reference results (current, post-canonicalisation)
 
-Fixed-position motifs: GTG @0 (187 seqs), AAAG @12 (42 seqs).
+**These replace the tables in the previous version of this file.** Canonicalisation renamed
+motifs; no statistic moved. Asserted by `tests/test_reference_results.py`.
 
-12049 (`counts_12049.csv.gz`, column `12049_R1`, reference `Control`, flanks `GTCTAGGGCGGCGGTAAAAC` /
-`ACTAGAGCACCAGAAGTCTA`, `get_patterns()`, score threshold 0.5):
+Both example datasets are **E. coli JJ1886** — Lab.ID 12049 *is* JJ1886 — from different
+sequencing runs. They are a cross-run replicate of one strain, and they must now report the
+*same* motifs. Before canonicalisation they reported every motif on opposite strands.
 
-| motif | fraction_depleted | num_sequences | avg_log2fc |
-|---|---|---|---|
-| GAGACC | 0.938776 | 49 | -2.768577 |
-| CACNNNNGTAT | 1.000000 | 97 | -3.220028 |
-| CACNNNNGTAC | 1.000000 | 78 | -3.258632 |
-| AACNNNNCTTT | 0.994233 | 867 | -3.372092 |
+JJ1886 (`countsTable.csv`, column `JJ1886_T0`, reference `MFDpir`, flanks
+`GTCCTAGGTATAATACTAGT` / `GTTTTAGAGCTAGAAATAGC`, patterns
+`[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)]`, score threshold 0.7):
+
+| motif | was called | fraction_depleted | num_sequences | avg_log2fc |
+|---|---|---|---|---|
+| GGTCTC | GAGACC | 1.0 | 6 | -3.750094 |
+| CACNNNNGTAC | GTACNNNNGTG | 1.0 | 6 | -4.922717 |
+| ATACNNNNGTG | — | 1.0 | 146 | -4.744952 |
+| AAAGNNNNGTT | — | 1.0 | 54 | -5.018200 |
+
+Fixed-position motifs: GTG @0 (187 seqs), AAAG @12 (42 seqs). Fixed-position motifs are **not**
+canonicalised — an offset is only meaningful on one strand.
+
+12049 (`counts_12049.csv.gz`, column `12049_R1`, reference `Control`, flanks
+`GTCTAGGGCGGCGGTAAAAC` / `ACTAGAGCACCAGAAGTCTA`, `get_patterns()`, score threshold 0.5):
+
+| motif | was called | fraction_depleted | num_sequences | avg_log2fc |
+|---|---|---|---|---|
+| GGTCTC | GAGACC | 0.938776 | 49 | -2.768577 |
+| ATACNNNNGTG | CACNNNNGTAT | 1.000000 | 97 | -3.220028 |
+| CACNNNNGTAC | — | 1.000000 | 78 | -3.258632 |
+| AAAGNNNNGTT | AACNNNNCTTT | 0.994233 | 867 | -3.372092 |
 
 Fixed-position motif: CTTT @4 (242 seqs).
 
+Library sizes: JJ1886 11,629 sequences (11,503 after the count filter); 12049 34,171 (30,108).
+
+## What the data changed
+
+Reproducing Fig 3 against the real 21-strain panel settled three things the plan had guessed at.
+
+1. **The non-determinism is already fixed.** The plan treated order-dependence as a phase-2
+   tidiness item. Bea's `code/fig3/README.md` in the paper repo documents it as a live problem —
+   under `PYTHONHASHSEED` 0/1/2 she saw `num_sequences` swing 61/77/80 and 85/85/33. **That does
+   not reproduce on `eren`**: the full panel is byte-identical across three hash seeds. The
+   vectorized numpy scan in `b758f8f` removed the set/dict iteration the old scan depended on.
+   Phase 2.2 is therefore mostly *already done*; what it still needs is a test (now written) and,
+   strictly, an order-independent filter by construction rather than by luck.
+2. **The strand problem reached the manuscript.** Results §2 calls the JJ1886 site "the
+   low-abundance **BsaI** motif (**GAGACC**)"; Results §3 calls the ST131 site
+   "5′-**GGTCTC**-3′ ... the widespread ST131 **Eco31I**". BsaI and Eco31I are isoschizomers —
+   `GGTCTC(1/5)` — so that is one site written two ways in one paper. Fixed by canonicalising to
+   REBASE's spelling; **§2 needs correcting**.
+3. **`max_candidates` was worse than assumed.** Bea's reference Fig 3 table is 374 rows, of which
+   **344 are unfiltered candidates from strain 16223 (381A)** alone, which then flow into the
+   IUPAC merge and produce motifs like `SSBNNSVNN`. Nothing published is wrong only because 381A
+   is dropped by hand. Now raises; the panel output is a clean 30 rows over 20 strains.
+
 ## Findings that shape the plan
 
-- **The fixed-position step is needed.** Fixed motifs are flexible motifs straddling the library flank (JJ1886 GTG @0
-  is ATACNNNNGTG with ATAC in the left flank). Switching the step off (fixed score threshold > 1) loses
-  ATACNNNNGTG and GTACNNNNGTG on JJ1886 and lowers the 12049 counts (97/78/867 → 60/56/555): many flexible motifs
-  match exactly the same flank-dominated sequences and all fail the unique-hit rescoring. Removing those sequences
-  before discovery, then rescoring on all sequences, recovers them. Script: see "Useful scripts" below.
-- **`filter_to_core_motifs` is inverted** relative to its docstring (it keeps a longer motif only when it scores
-  *worse*). No effect on either example and it cannot change which sequences are removed, but it can add useless
-  rows.
-- **Thresholds mix `<` and `≤`**: `score` uses `log2FC < thr`; candidate selection uses `>` for score and support;
-  the final filter uses `>=` and `avg_log2fc <= thr`; notebook text says "log2FC ≤ -1".
-- **`find_restricted_motifs` and `find_restricted_motifs_mp` differ**: the first filters redundancy after each
-  pattern, the second once at the end; with an order-dependent filter they can disagree.
-- **Order dependence**: when a motif and its reverse complement tie, which one is kept depends on row order
-  (GAGACC vs GGTCTC).
+- **The fixed-position step is needed.** Fixed motifs are flexible motifs straddling the library
+  flank (JJ1886 GTG @0 is ATACNNNNGTG with ATAC in the left flank). Switching the step off
+  (fixed score threshold > 1) loses ATACNNNNGTG and CACNNNNGTAC on JJ1886 and lowers the 12049
+  counts (97/78/867 → 60/56/555): many flexible motifs match exactly the same flank-dominated
+  sequences and all fail the unique-hit rescoring. Removing those sequences before discovery,
+  then rescoring on all sequences, recovers them.
+- **`filter_to_core_motifs` is inverted** relative to its docstring (it keeps a longer motif only
+  when it scores *worse*). No effect on either example and it cannot change which sequences are
+  removed, but it can add useless rows.
+- **Thresholds mix `<` and `≤`**: `score` uses `log2FC < thr`; candidate selection uses `>` for
+  score and support; the final filter uses `>=` and `avg_log2fc <= thr`; notebook text says
+  "log2FC ≤ -1". The same muddle exists upstream in `calculate_log2fc`, whose `>` makes the
+  documented "≥ 10 UMIs" filter an effective ≥ 11 — see `../DATA.md`.
+- **`find_restricted_motifs` and `find_restricted_motifs_mp` differ**: the first filters
+  redundancy after each pattern, the second once at the end; with an order-dependent filter they
+  can disagree.
+- **Order dependence** (motif vs reverse complement): resolved at the output boundary by
+  `canonical_motif`, not inside the filter. Good enough for correct results; still worth fixing
+  properly in 2.1/2.2.
+- **Support counts moved with the rescoring revert** and nobody has adjudicated them. Across the
+  panel `avg_log2fc` shifts by at most 0.026 but `num_sequences` rises a lot — `AAACNNNNGTC` on
+  16171 is 341 against Bea's 127. Which is *correct* is unknown. This is what makes 0.2 urgent.
 
 ## Rules for every phase
 
-- Compare both datasets against the reference tables above after each phase.
-- `nbdev-test` under the memory cap, then `nbdev-clean` + `nbdev-export`; the library must be in sync.
-- One commit per phase. Phases 1 and 3 must not change results; in phase 2 every difference is reported and
-  explained before committing.
-- "Results" means the motif tables and fixed-position counts above, nothing else. Printed cell outputs (directory
-  listings, `df.head()`, `df.columns`) do change in phase 0 and that is expected — `nbdev-test --save` rewrites
-  them.
+- Run `tests/test_reference_results.py` after every phase — it replaces the manual table
+  comparison the old plan described.
+- `nbdev-test --n-workers 1`, then `nbdev-clean` + `nbdev-export`; the library must be in sync.
+  Use absolute env paths (see working rules).
+- One commit per phase. Phases 1 and 3 must not change results; in phase 2 every difference is
+  reported and explained before committing.
+- "Results" means the motif tables and fixed-position counts above, nothing else.
 
-## Phase 0: Regression harness and example data (do first)
+## Phase 0: Regression harness and example data
 
-The comparison scripts from the first session are gone, and every later phase rests on "results did not change".
-Build the check before touching anything, so each phase ends with one command instead of a manual read.
-
-1. A committed check (`tests/test_reference_results.py`, or a `#| hide` cell) that runs both datasets at the
-   reference settings above and asserts the motif rows and fixed-position counts, to a fixed tolerance. Run it under
-   the memory cap at the end of every phase.
-2. Synthetic fixture `example_data/toy_library.csv.gz`: a few hundred sequences from a fixed seed with a planted
-   motif at a known depletion rate. It makes the unit tests fast and gives phase 3 the hand-checkable examples it
-   asks for in sections 2, 4, 6 and 7 — where the expected answer is known by construction, not by having been
-   observed once.
+1. ~~A committed check that runs both datasets at the reference settings and asserts the motif
+   rows and fixed-position counts.~~ **Done**: `tests/test_reference_results.py`. It asserts both
+   tables to 1e-6, asserts the two datasets agree on motif labels, and reruns JJ1886 in
+   subprocesses at `PYTHONHASHSEED` 0/1/2 to pin determinism.
+2. **Synthetic fixture `example_data/toy_library.csv.gz` — do this next.** A few hundred
+   sequences from a fixed seed with a planted motif at a known depletion rate. Originally
+   justified as "makes unit tests fast and gives phase 3 hand-checkable examples". It is now
+   also the **only way to settle which `num_sequences` is right**: with a planted motif the
+   correct support count is known by construction, so the rescoring revert can be judged on
+   evidence instead of on which option broke less. Promote ahead of everything else.
 3. Slim the example data, 17 MB → ~1.7 MB:
-   - `countsTable.csv` → `counts_jj1886.csv.gz` holding `seq,JJ1886_T0,MFDpir` (5.39 MB → 0.12 MB). Verified: no
-     source cell in any notebook reads another column; the other 127 appear only inside printed `df.columns` /
-     `df.head()` output. Name the sequence column `seq` to match the 12049 file (it is currently unnamed), and
-     update the loading cells.
-   - `counts_long.csv` and `counts_long_clean.csv`: delete (9.6 MB). Their only consumers are the `#| eval: false`
-     cells that phase 1.1 removes anyway, including the one that writes `counts_long_clean.csv` back into the
-     package data folder.
+   - `countsTable.csv` → `counts_jj1886.csv.gz` holding `seq,JJ1886_T0,MFDpir` (5.4 MB →
+     0.12 MB). Verified: no source cell reads another column. Name the sequence column `seq` to
+     match the 12049 file (currently unnamed), and update the loading cells — including
+     `tests/test_reference_results.py`, which hardcodes `Unnamed: 0`.
+   - `counts_long.csv` and `counts_long_clean.csv`: delete (9.7 MB). Only consumers are the
+     `#| eval: false` cells that phase 1.1 removes.
    - `counts_12049.csv.gz`: unchanged, already minimal.
-   - Git history keeps the full table, so nothing is lost from the repo — only from the installed package.
-4. Re-run the harness. The reference tables must be byte-identical after the data change; if they are not, the
-   column trim was wrong.
+   - Consider *adding* a second strain from the BB2 panel: both current examples are JJ1886, so
+     the suite tests one strain twice.
+4. Re-run the harness. The tables must be identical after the data change.
 
 ## Phase 1: Remove dead code (no change to results)
 
-1. Core notebook: remove `get_fold_change_values_per_site_old` + its example, the `filted_log2fc_df` cell, and the
-   three `#| eval: false` leftovers (the `counts_long` cleanup that writes into the package data folder, the 16226 run,
-   the duplicate JJ1886 `_mp` run).
-2. Imports: drop `groupby`, `chain`, `itemgetter`, `choice`, the duplicate `re`, unused `typing` names; move
-   `warnings`, `Pool`, `functools` to the top import cell.
-3. Docstrings: module description (currently "Fill in a module description here"); remove "all sequences same
-   length" from `get_sites_in_seq`; remove the non-existent `fc_improvement_margin` from `filter_to_core_motifs`.
+1. Core notebook: remove `get_fold_change_values_per_site_old` + its example (still in
+   `nbs/00_core.ipynb`, not exported), the `filted_log2fc_df` cell, and the three
+   `#| eval: false` leftovers.
+2. Imports: drop `groupby`, `chain`, `itemgetter`, `choice`, the duplicate `re`, unused `typing`
+   names; move `Pool` and `functools` to the top import cell. **`warnings` is already moved** —
+   but a second `import warnings` remains at `core.py:797`; remove it.
+3. Docstrings: module description (currently "Fill in a module description here"); remove "all
+   sequences same length" from `get_sites_in_seq`; remove the non-existent
+   `fc_improvement_margin` from `filter_to_core_motifs`.
 4. Utils: remove functions the library never uses: `check_specific_matches_broad_iupac`,
-   `create_motif_presence_matrix`, `flatten`, `get_all_sites`, `allseqs`. Checked: none is called from `core.py`
-   or `plotting.py`. `flatten`, `get_all_sites` and `allseqs` are called from `old_nbs/` — confirm `old_nbs/` is
-   frozen and not exported before deleting. (The `flatten` hit in `00_core.ipynb` is the word in a comment; that
-   cell uses `chain.from_iterable`.)
-5. Merge `get_motif_filter_with_context` and `_get_filter_for_motif` into one public function using the shared IUPAC
-   table; update `plotting.py` and `update_motif_scores_from_unique_hits`.
+   `create_motif_presence_matrix`, `flatten`, `get_all_sites`, `allseqs`. `flatten`,
+   `get_all_sites` and `allseqs` are called from `old_nbs/` — confirm it is frozen first.
+5. Merge `get_motif_filter_with_context` and `_get_filter_for_motif` into one public function
+   using the shared IUPAC table; update `plotting.py` and `update_motif_scores_from_unique_hits`.
 6. Remove the unused `find_restricted_motifs` import in `plotting.py`.
-7. (Moved to phase 0.3 — the data files go with the `#| eval: false` cells that use them.)
 
 ## Phase 2: Logic fixes (may change results; check each separately)
 
-1. One pipeline function `find_restricted_motifs(..., n_jobs=1)`: scan every pattern, then run the redundancy filter
-   once over all candidates. Keep `find_restricted_motifs_mp` as a thin deprecated alias for Bea's scripts.
-2. Make the redundancy filter order-independent: process candidates in a fixed order (pattern, then motif); on a
-   motif / reverse-complement tie keep the alphabetically first.
-3. Fix the comparison in `filter_to_core_motifs` (keep a longer motif only if it beats the shorter one by more than
-   the margin); add a test on a small made-up table.
-4. Strict `<` everywhere (decision 1): `score` already does this; change candidate selection (`core.py:275`,
-   `core.py:590`) and the final filter (`core.py:739-741`), and state the convention in the docstrings. No reference
-   value sits on a boundary, so this should not move the tables — confirm with the harness rather than assume it.
-5. `max_candidates` raises an error (decision 2) carrying the threshold advice from `core.py:878`, instead of
-   returning unfiltered candidates that look like normal output.
-6. Experiment, reported but not adopted (decision 4): repeat the unique-hit rescoring until no more motifs are
-   dropped; record whether it changes either dataset, and write the answer into this file.
+1. One pipeline function `find_restricted_motifs(..., n_jobs=1)`: scan every pattern, then run
+   the redundancy filter once over all candidates. Keep `find_restricted_motifs_mp` as a thin
+   deprecated alias. **Note `randseq/core_v2.py` now also exists as a compat shim for Bea's
+   scripts** — fold that into the same deprecation story rather than having two.
+2. Make the redundancy filter order-independent *by construction*: fixed candidate order
+   (pattern, then motif). The reverse-complement tie is already handled downstream by
+   `canonical_motif`, and output is empirically stable across hash seeds, so this is now about
+   guaranteeing the property rather than obtaining it.
+3. Fix the comparison in `filter_to_core_motifs`; add a test on a small made-up table.
+4. Strict `<` everywhere (decision 1): change candidate selection and the final filter, state the
+   convention in the docstrings. No reference value sits on a boundary, so the tables should not
+   move — confirm with the harness.
+5. ~~`max_candidates` raises an error.~~ **Done**: `TooManyCandidatesError`, with the candidate
+   table attached as `.candidates`.
+6. Experiment, reported but not adopted (decision 4): repeat the unique-hit rescoring until no
+   more motifs are dropped; record whether it changes either dataset, and write the answer here.
+   Best done after 0.2, so the fixture can say which answer is right.
 
 ## Phase 3: Rewrite the core notebook as a walkthrough (no change to results)
 
-Each section: short explanation, a small hand-checkable example, and a real-data example.
+Unchanged from the previous version, with two additions:
 
-0. What RandSeq measures (random library, delivery into the strain, restriction sites depleted) + pipeline overview.
-1. Counts → log2FC; library flanks and why they matter.
-2. `score`: fraction of sequences depleted (toy example).
-3. Step 1, fixed-position motifs: `identify_depleted_motifs_scanning_ends` + `filter_to_core_motifs` on JJ1886,
-   showing that GTG @0 is ATACNNNNGTG straddling the flank.
-4. Step 2, set those sequences aside, with the with/without comparison from "Findings".
-5. Step 3, flexible patterns: `(d1, spacer, d2)`, `get_patterns`, `encode_library`, `get_pattern_scores`
-   (toy + JJ1886).
-6. Step 4, redundancy filtering: made-up table with CACNNNNGTA / CACNNNNGTAT / CACNNNNGTAC showing both directions
-   of the rule.
-7. Step 5, unique-hit rescoring: a motif losing its support; why it is done over all sequences.
-8. Full pipeline: `find_restricted_motifs` on JJ1886 and 12049.
-9. Appendix: string-based reference scanner, the fast scan's encoding, equivalence tests.
+- Section 0 should say what the two example datasets *are* — both JJ1886, different runs — since
+  the docs currently imply they are unrelated.
+- Add a short section on reporting: why a motif and its reverse complement are one answer, and
+  how `canonical_motif` chooses. This is the thing most likely to confuse someone comparing new
+  output against an old table.
 
-Utils and plotting keep their structure, but every exported function gets a docstring and at least one example or
-test.
+Sections otherwise as before: 0 what RandSeq measures; 1 counts → log2FC and flanks; 2 `score`;
+3 fixed-position motifs; 4 setting those sequences aside; 5 flexible patterns and the fast scan;
+6 redundancy filtering; 7 unique-hit rescoring; 8 full pipeline; 9 appendix with the string-based
+reference scanner and equivalence tests.
 
 ## Phase 4: Wrap up
 
-- Push to `eren` and confirm CI passes.
-- Short summary of result changes for David and Bea (especially anything affecting Fig3).
+- Push `eren` (one unpushed commit, `7190691`) and confirm CI passes.
+- ~~Short summary of result changes for David and Bea.~~ Written as `CHANGELOG.md`. **Not yet
+  sent to Bea** — see below.
 
-## Decisions (2026-09-29)
+## Decisions
 
-1. **Depleted is `log2FC < thr`** (strict), as `score` does today (`core.py:171`). Candidate selection
-   (`core.py:275`, `core.py:590`) and the final filter (`core.py:739-741`) change to match, and the notebook text
-   "log2FC ≤ -1" is corrected.
-2. **`max_candidates` raises an error** carrying the threshold advice already drafted at `core.py:878`, instead of
-   silently returning unfiltered candidates.
-3. **Example data is slimmed** — see phase 0.3. The full 129-column counts table is archived outside the repo, so
-   the package ships only what its examples use.
-4. **Iterative rescoring (phase 2.6): run the experiment and report the result**, do not adopt it as the default.
+1. **Depleted is `log2FC < thr`** (strict), as `score` does today. Candidate selection and the
+   final filter change to match; the notebook text "log2FC ≤ -1" is corrected. *(2026-09-29)*
+2. **`max_candidates` raises an error.** *(2026-09-29, done)*
+3. **Example data is slimmed.** The full 129-column counts table is archived outside the repo.
+   *(2026-09-29)*
+4. **Iterative rescoring: run the experiment and report**, do not adopt as default. *(2026-09-29)*
+5. **Motif strand: match REBASE's spelling, fall back to alphabetically-first** for motifs REBASE
+   does not know. Not plain alphabetical, which would give `GAGACC` and contradict the paper.
+   The Gold Standard list (n=983, downloaded 2025-12-03) ships as package data. *(2026-09-29, done)*
+6. **Handoff scope: correctness only.** Threshold cleanup and absorbing the fastq→counts step are
+   deferred until after Bea has a usable version. *(2026-09-29)*
 
-## Still to tell Bea (no email sent yet — send before phase 2, not after)
+## Still to tell Bea — `CHANGELOG.md` is written, nothing sent
 
-The rescoring revert already landed in `b758f8f`, so the Fig3 numbers have moved whether or not the cleanup
-finishes. If she is working with them now, this should not wait for phase 4.
+All of this is in `CHANGELOG.md` in a form she can act on. It has not been sent.
 
-- The unique-hit rescoring change in core_v2 was reverted (it lost ATACNNNNGTG on JJ1886); her Fig3 numbers may
-  shift (AACNNNNCTTT on 12049: 640 → 867).
-- The redundancy filter is order-dependent; strain 381A (> 150 candidates) should be re-checked.
-- The notebook examples used `cpu_count=8`, which crashed a 16 GB machine; no longer needed.
+- Motif labels change (15 of 30 rows on the panel); no statistic moves. Her
+  `methylome_crossref_Fig3.R` should be unaffected since it expands reverse complements, but the
+  IUPAC-merged names in `..._iupac_merged_mm2.csv` will change spelling.
+- `generate_fig3_motifs.py` will now raise on 16223; it needs a `try/except
+  TooManyCandidatesError`. `../work/fig3_motifs.py` does this already.
+- The rescoring revert raises `num_sequences` substantially (`AAACNNNNGTC` on 16171: 341 vs 127).
+  **Results §2 still has "n=X, n=X and n=X" placeholders** — fill from a current run.
+- Manuscript §2 `GAGACC` should become `GGTCTC` to match §3.
+- Her vendored `randseq_package/` still has `core.py` + `core_v2.py` and has been forking from
+  `eren` since 2026-09-25. The shim keeps her imports working, but the two copies should be
+  reconciled.
 
 ## Useful scripts
 
-The comparison and logic-check scripts from the first session were in the session scratchpad and are gone. Phase 0.1
-replaces them with a committed check. The one-off check (fixed-position step on/off) is easy to redo: call
-`find_restricted_motifs` twice with the reference settings above, the second time with `fixed_motif_score_thr=1.01`
-so no fixed motif is kept.
+- `../work/reference_run.py` — both example datasets at the reference settings.
+- `../work/fig3_motifs.py` — the 21-strain panel; handles `TooManyCandidatesError`.
+- `../work/fig3_seeds.sbatch` — the same, as a 3-seed array job for the determinism check.
+- `../work/patch_nb.py`, `../work/add_cells.py` — edit nbdev notebooks (string replace / insert
+  cells) so the library can be regenerated with `nbdev-export`.
+- One-off check of the fixed-position step: call `find_restricted_motifs` twice, the second time
+  with `fixed_motif_score_thr=1.01` so no fixed motif is kept.
 
-## Verified against the code on `eren` (2026-09-29)
+## Verified against the code on `eren`
 
-- `filter_to_core_motifs` inversion confirmed at `core.py:322-326`: `candidate_score >= core_score - margin` sets
-  `is_subsumed = True`, so the longer motif is dropped when it scores *as well or better* and kept only when it
-  scores worse by more than the margin. The docstring at `core.py:289` also documents an `fc_improvement_margin`
-  parameter that does not exist.
-- Threshold mixing confirmed: `<` at `core.py:171`, `>` at `core.py:275` and `core.py:590`, `>=` and `<=` at
-  `core.py:739-741`.
-- Example data audited; see phase 0.3 for the measured sizes.
+- `filter_to_core_motifs` inversion confirmed: `candidate_score >= core_score - margin` sets
+  `is_subsumed = True`, so the longer motif is dropped when it scores *as well or better*. Its
+  docstring also documents an `fc_improvement_margin` parameter that does not exist.
+- Threshold mixing confirmed (`<` in `score`, `>` in candidate selection, `>=`/`<=` in the final
+  filter). Line numbers from the pre-`7190691` tree and now shifted; re-grep rather than trust them.
+- Motif statistics are **exactly** strand-symmetric — measured: `GAGACC`/`GGTCTC`,
+  `AACNNNNCTTT`/`AAAGNNNNGTT` and `CACNNNNGTAT`/`ATACNNNNGTG` each give identical `n`, `score`
+  and mean on 12049. This is what makes canonicalisation lossless.
+- Example data audited; see phase 0.3 for measured sizes.

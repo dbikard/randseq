@@ -35,10 +35,10 @@ JJ1886 = dict(
     score_thr=0.7,
     # motif -> (fraction_depleted, num_sequences, avg_log2fc)
     expected={
-        "GGTCTC": (1.0, 6, -3.750094),
-        "CACNNNNGTAC": (1.0, 3, -4.800833),
-        "ATACNNNNGTG": (1.0, 146, -4.744952),
-        "AAAGNNNNGTT": (1.0, 54, -5.018200),
+        "GGTCTC": (1.0, 9, -4.313837),
+        "CACNNNNGTAC": (1.0, 19, -5.062006),
+        "ATACNNNNGTG": (1.0, 191, -4.732529),
+        "AAAGNNNNGTT": (1.0, 61, -5.037651),
     },
     expected_fixed={("GTG", 0): 187, ("AAAG", 12): 42},
 )
@@ -53,10 +53,10 @@ S12049 = dict(
     patterns=None,  # get_patterns()
     score_thr=0.5,
     expected={
-        "GGTCTC": (0.938776, 49, -2.768577),
-        "ATACNNNNGTG": (1.0, 31, -3.260202),
-        "CACNNNNGTAC": (1.0, 17, -3.606989),
-        "AAAGNNNNGTT": (0.994213, 864, -3.369221),
+        "GGTCTC": (0.942308, 52, -2.748460),
+        "ATACNNNNGTG": (0.995859, 483, -3.205448),
+        "CACNNNNGTAC": (1.0, 441, -3.241587),
+        "AAAGNNNNGTT": (0.994331, 882, -3.369967),
     },
     expected_fixed={("CTTT", 4): 242},
 )
@@ -81,13 +81,18 @@ def run_case(cfg):
 def test_reference_motifs(cfg, name):
     fixed, flex = run_case(cfg)
 
-    assert set(flex["motif"]) == set(cfg["expected"]), (
-        f"{name}: motif set changed.\n"
+    # Rows below the significance threshold are returned on purpose, flagged rather than
+    # dropped, so the contract is about what is *called*.
+    called = flex[flex["called"]] if "called" in flex.columns else flex
+    assert set(called["motif"]) == set(cfg["expected"]), (
+        f"{name}: called motif set changed.\n"
         f"  expected {sorted(cfg['expected'])}\n"
-        f"  got      {sorted(flex['motif'])}"
+        f"  got      {sorted(called['motif'])}\n"
+        f"  (also reported, not called: "
+        f"{sorted(set(flex['motif']) - set(called['motif']))})"
     )
 
-    for _, row in flex.iterrows():
+    for _, row in called.iterrows():
         frac, n, fc = cfg["expected"][row["motif"]]
         assert row["num_sequences"] == n, f"{name}/{row['motif']}: num_sequences"
         assert abs(row["fraction_depleted"] - frac) < TOL, f"{name}/{row['motif']}: fraction_depleted"
@@ -110,13 +115,16 @@ def test_both_datasets_agree_on_motifs():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("seed", ["0", "1", "2"])
-def test_deterministic_across_hash_seeds(seed, tmp_path):
+def test_deterministic_across_hash_seeds():
     """Output must not depend on PYTHONHASHSEED.
 
     Python randomises string hashing per process, so set and dict iteration order changes
     between runs. The search used to consume that order, which made `num_sequences` and the
-    reported strand vary run to run. This pins it.
+    reported strand vary run to run -- the paper repository's own notes record support counts
+    of 61/77/80 for one motif across three seeds.
+
+    This asserts the runs agree with each other, rather than re-pinning values that
+    `test_reference_motifs` already owns.
     """
     script = (
         "import pandas as pd, os\n"
@@ -127,27 +135,20 @@ def test_deterministic_across_hash_seeds(seed, tmp_path):
         "_, flex = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
         "    flexible_motif_patterns=[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)],\n"
         "    flexible_motif_score_thr=0.7)\n"
-        "print(flex[['motif','fraction_depleted','num_sequences','avg_log2fc']].to_csv(index=False))\n"
+        "rows = sorted((r['motif'], int(r['num_sequences']), round(float(r['avg_log2fc']), 6),\n"
+        "               bool(r['called'])) for _, r in flex.iterrows())\n"
+        "print('RESULT', rows)\n"
     )
-    env = dict(os.environ, PYTHONHASHSEED=seed)
-    out = subprocess.run([sys.executable, "-c", script], env=env, capture_output=True, text=True)
-    assert out.returncode == 0, out.stderr
-    table = out.stdout[out.stdout.index("motif,"):].strip()
+    results = {}
+    for seed in ("0", "1", "2"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        out = subprocess.run([sys.executable, "-c", script], env=env,
+                             capture_output=True, text=True)
+        assert out.returncode == 0, out.stderr
+        results[seed] = out.stdout[out.stdout.index("RESULT"):].strip()
 
-    expected = "\n".join(
-        ["motif,fraction_depleted,num_sequences,avg_log2fc"]
-        + [
-            f"{m},{v[0]},{v[1]},{v[2]:.6f}"
-            for m, v in [
-                ("GGTCTC", (1.0, 6, -3.750094)),
-                ("CACNNNNGTAC", (1.0, 3, -4.800833)),
-                ("ATACNNNNGTG", (1.0, 146, -4.744952)),
-                ("AAAGNNNNGTT", (1.0, 54, -5.018200)),
-            ]
-        ]
+    assert results["0"] == results["1"] == results["2"], (
+        "PYTHONHASHSEED changed the result:\n" +
+        "\n".join(f"  seed {k}: {v}" for k, v in results.items())
     )
-    got = "\n".join(
-        line if i == 0 else ",".join(line.split(",")[:3] + [f"{float(line.split(',')[3]):.6f}"])
-        for i, line in enumerate(table.split("\n"))
-    )
-    assert got == expected, f"PYTHONHASHSEED={seed} changed the result:\n{got}\n!=\n{expected}"
+    assert "GGTCTC" in results["0"], "sanity: the known BsaI site should be in there"

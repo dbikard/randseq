@@ -615,7 +615,8 @@ def filter_redundant_patterns(df, score_margin=0.05):
        (specific is significantly better → drop general)
 
     3. For equivalent motifs the one with the lower score is dropped.
-       If scores are equal, the one with the higher reset-index is dropped.
+       If scores are equal, the tie is broken on the motif string, so the outcome does not
+       depend on the order the candidates were produced in.
 
     Args:
         df (pd.DataFrame): DataFrame with 'motif' and 'fraction_depleted'
@@ -627,6 +628,20 @@ def filter_redundant_patterns(df, score_margin=0.05):
     """
     indices_to_drop = set()
     df_reset = df.reset_index()
+
+    # Process candidates in a fixed, content-derived order. Without this the outcome depends on
+    # the order patterns happened to be scanned in -- which differs between the single-process
+    # and multiprocessing pipelines, and between runs -- so the same set of candidates could be
+    # filtered two different ways. Sorting here makes the result a function of the candidate
+    # SET alone.
+    _sort_on = ['_canonical', 'motif']
+    df_reset['_canonical'] = df_reset['motif'].map(canonical_motif)
+    if 'pattern' in df_reset.columns:
+        df_reset['_pattern'] = df_reset['pattern'].astype(str)
+        _sort_on = ['_pattern'] + _sort_on
+    df_reset = (df_reset.sort_values(_sort_on, kind='mergesort')
+                        .drop(columns=[c for c in ('_canonical', '_pattern') if c in df_reset])
+                        .reset_index(drop=True))
 
     for i, p1 in df_reset.iterrows():
         if i in indices_to_drop:
@@ -668,7 +683,12 @@ def filter_redundant_patterns(df, score_margin=0.05):
                 if score1 < score2:
                     indices_to_drop.add(i)
                     break
-                elif score1 == score2 and i > j:
+                elif score1 == score2 and motif1 > motif2:
+                    # Equal scores: break the tie on the motif itself, not on row position.
+                    # A motif and its reverse complement always score identically, so this is
+                    # the common case; deciding it by position is what made the choice of
+                    # strand depend on scan order. The label is canonicalised on output
+                    # anyway, so which of the pair survives here is not user-visible.
                     indices_to_drop.add(i)
                     break
 

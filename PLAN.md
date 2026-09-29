@@ -13,13 +13,13 @@ the handoff is phases 0.1 / 2.2 / 2.5 plus the strand fix — *not* the full cle
 | phase | item | status |
 |---|---|---|
 | 0.1 | regression harness | **done** — `tests/test_reference_results.py`, 6 tests |
-| 0.2 | synthetic fixture | **not done — now the top priority**, see below |
-| 0.3 | slim example data | not done (17 MB still shipped) |
-| 1 | remove dead code | not done (one item done incidentally: `warnings` moved to the top cell) |
-| 2.1 | one pipeline function `n_jobs=` | not done — both functions still exist |
-| 2.2 | order-independence | **partly** — output is deterministic and the strand is canonical; the filter itself is still order-dependent by construction |
-| 2.3 | `filter_to_core_motifs` inversion | not done |
-| 2.4 | strict `<` everywhere | not done |
+| 0.2 | example data for the walkthrough | **done** — superseded by a curated 8-strain real panel, see below |
+| 0.3 | slim example data | **done** — 17 MB → 2.8 MB, and 1 illustrative strain → 9 |
+| 1 | remove dead code | **done** — 658 lines, results unchanged |
+| 2.1 | one pipeline function `n_jobs=` | in progress — measuring whether the two semantics differ first |
+| 2.2 | order-independence | **done** — the redundancy filter now sorts deterministically and tie-breaks on the motif, not row position |
+| 2.3 | `filter_to_core_motifs` inversion | **done** — was doubly inverted; no effect on the reference tables |
+| 2.4 | threshold convention | **done** — and it DID move `num_sequences`, contrary to the plan's prediction |
 | 2.5 | `max_candidates` raises | **done** |
 | 2.6 | iterative-rescoring experiment | not done |
 | 3 | notebook walkthrough | not done |
@@ -27,7 +27,27 @@ the handoff is phases 0.1 / 2.2 / 2.5 plus the strand fix — *not* the full cle
 | — | canonical motif strand | **done** (not in the original plan) |
 | — | `core_v2` compat shim | **done** (not in the original plan) |
 
-One commit ahead of `origin/eren` and unpushed: `7190691`.
+Unpushed commits on `eren`: 9 and counting.
+
+### Plan items that turned out to be wrong
+
+Recorded because the plan marked them "verified against the code", and they were not:
+
+1. **Example data** — the plan said no cell reads a column beyond `JJ1886_T0`/`MFDpir`. The
+   loading cells filter on *all 19* `_T0` columns and `01_utils` prints `min(axis=0)` across
+   them, so the specified 2-column trim would have silently changed a printed output.
+2. **`get_motif_filter_with_context` is live external API.** Item 1.5 said merge it away; Bea's
+   Fig 5 scripts import it by name. Unified behind her name instead, after checking the two
+   implementations agree on 9 real motifs.
+3. **The typing imports are used.** Only `choice`, `groupby`, `chain`, `itemgetter` and a
+   duplicated `re` were dead.
+4. **`find_restricted_motifs` in `plotting.py`** is unused by the module but used by a notebook
+   example; it moved to a non-exported cell rather than being deleted.
+5. **Phase 2.4 does move results.** The plan predicted no reference value sat on a boundary.
+   One did: `min_support` was compared with `>`, so `min_support=3` meant four.
+6. **`get_sites_in_seq`'s docstring** claimed all sequences must be equal length and that it
+   raises otherwise. Neither is true, and it matters — only ~91% of real inserts are exactly
+   150 nt.
 
 ## Working rules (Maestro, not WSL)
 

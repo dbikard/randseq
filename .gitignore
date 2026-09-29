@@ -157,3 +157,6 @@ llms.txt
 .snakemake/
 results/
 results_test/
+
+# generated build metadata
+randseq.egg-info/

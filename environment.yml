@@ -1,0 +1,47 @@
+# Development environment for the randseq / randcount work.
+#
+#   conda env create -f environment.yml
+#   conda env config vars set PYTHONNOUSERSITE=1 -n randseq     # see below, do not skip
+#   conda activate randseq
+#   python -m pip install -e randseq/ -e randcount/
+#
+# PYTHONNOUSERSITE matters on Maestro. `~/.local/lib/python3.11/site-packages` is visible to
+# *any* python 3.11, including a conda env's, so without it the env silently borrows packages
+# from outside itself and is not reproducible. It is already set on the existing `randseq` env.
+#
+# Versions are those verified working on 2026-09-29. Pinned to minor so the environment can be
+# rebuilt, not frozen to exact builds, which does not transfer between machines.
+
+name: randseq
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      # randseq (motif inference)
+      - fastcore~=2.2
+      - pandas~=3.0
+      - numpy~=2.4
+      - scipy~=1.17
+      - matplotlib~=3.11
+      - seaborn~=0.13
+      - tqdm~=4.70
+      - pyahocorasick~=2.3
+      - plotnine~=0.15
+      # randcount (fastq -> counts) adds nothing beyond pandas
+      # pipeline
+      - snakemake>=8,<9
+      - snakemake-executor-plugin-slurm
+      # development. nbdev needs a real notebook runtime to execute the notebooks it tests --
+      # these used to be picked up silently from ~/.local, which is exactly what
+      # PYTHONNOUSERSITE now prevents, so they have to be declared.
+      - nbdev~=3.3          # randseq is an nbdev package; notebooks are the source of truth
+      - ipython
+      - ipykernel
+      - execnb
+      - jupyter_client
+      - nbformat
+      - nbclient
+      - pytest~=9.1

@@ -8,10 +8,11 @@ Docs: https://dbikard.github.io/randseq/core.html.md"""
 __all__ = ['get_sites_in_seq', 'score', 'identify_depleted_motifs_scanning_ends', 'filter_to_core_motifs',
            'get_fold_change_values_per_site', 'filter_sequences_without_core_motifs', 'get_sites_scores',
            'encode_library', 'decode_motif_codes', 'get_pattern_scores', 'process_single_flexible_pattern',
-           'filter_redundant_patterns', 'update_motif_scores_from_unique_hits', 'TooManyCandidatesError',
-           'find_restricted_motifs', 'find_restricted_motifs_mp']
+           'filter_redundant_patterns', 'encode_motif', 'motif_presence_matrix', 'update_motif_scores_from_unique_hits',
+           'TooManyCandidatesError', 'find_restricted_motifs', 'find_restricted_motifs_mp']
 
 # %% ../nbs/00_core.ipynb #ef76c820
+import ast
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -695,6 +696,89 @@ def filter_redundant_patterns(df, score_margin=0.05):
     original_indices_to_drop = df_reset.loc[list(indices_to_drop)]['index']
     return df.drop(original_indices_to_drop)
 
+# %% ../nbs/00_core.ipynb #817613a7
+def encode_motif(motif, pattern):
+    """Integer code of `motif` under `pattern`, inverse of `decode_motif_codes`.
+
+    Returns None if the motif does not fit the pattern or contains a base outside ACGT --
+    IUPAC-degenerate motifs have no single code and fall back to the regex path.
+    """
+    d1, spacer, d2 = pattern
+    if len(motif) != d1 + spacer + d2:
+        return None
+    defined = motif[:d1] + motif[d1 + spacer:]
+    if d1 + spacer + d2 and any(c != "N" for c in motif[d1:d1 + spacer]):
+        return None                       # spacer must be undefined
+    code = 0
+    for ch in defined:
+        v = "ACGT".find(ch)
+        if v < 0:
+            return None
+        code = code * 4 + v
+    return code
+
+# %% ../nbs/00_core.ipynb #d7fbcd48
+def motif_presence_matrix(encoded_library, motifs, patterns):
+    """Boolean (n_sequences, n_motifs): does sequence i contain motif j, on either strand?
+
+    One pass per distinct pattern rather than one per motif, and a lookup into the window codes
+    rather than a regex per sequence. Motifs whose pattern is unknown, or which contain IUPAC
+    ambiguity codes, are left as all-False here; the caller falls back to the regex path for
+    those, so behaviour is unchanged and only the common case gets faster.
+
+    Returns `(matrix, handled)` where `handled` marks the motifs the matrix actually covers.
+    """
+    fwd, rc = encoded_library
+    n_seq = fwd.shape[0]
+    matrix = np.zeros((n_seq, len(motifs)), dtype=bool)
+    handled = np.zeros(len(motifs), dtype=bool)
+
+    by_pattern = defaultdict(list)
+    for j, (motif, pattern) in enumerate(zip(motifs, patterns)):
+        if pattern is None:
+            continue
+        code = encode_motif(motif, pattern)
+        if code is not None:
+            by_pattern[pattern].append((j, code))
+
+    for pattern, entries in by_pattern.items():
+        n_codes = 4 ** (pattern[0] + pattern[2])
+        # code -> column in `matrix`, or -1 for codes we do not care about
+        lookup = np.full(n_codes + 1, -1, dtype=np.int32)
+        for j, code in entries:
+            lookup[code] = j
+        codes = np.concatenate(
+            [_pattern_window_codes(fwd, pattern), _pattern_window_codes(rc, pattern)], axis=1)
+        cols = lookup[codes]
+        rows, where = np.nonzero(cols >= 0)
+        if len(rows):
+            matrix[rows, cols[rows, where]] = True
+        for j, _ in entries:
+            handled[j] = True
+
+    return matrix, handled
+
+# %% ../nbs/00_core.ipynb #455f12bb
+def _unique_hit_stats(matrix, fc_values, log2fc_thr):
+    """Per-motif statistics over sequences carrying exactly one of the motifs in `matrix`.
+
+    Co-occurring motifs are the reason this step exists: a sequence carrying two candidates
+    cannot tell us which one depleted it, so it is excluded from both. Counting how many
+    candidates each sequence carries, once, replaces intersecting every pair of motifs.
+    """
+    fc = np.asarray(fc_values, dtype=float)
+    only_one = matrix.sum(axis=1) == 1
+    unique = matrix & only_one[:, None]
+    n_seqs = unique.sum(axis=0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        n_depleted = (unique & (fc < log2fc_thr)[:, None]).sum(axis=0)
+        fc_sum = (unique * fc[:, None]).sum(axis=0)
+        frac = np.where(n_seqs > 0, n_depleted / np.maximum(n_seqs, 1), 0.0)
+        # 0.0 rather than NaN for a motif with no unique sequences, matching
+        # the behaviour this replaced; such motifs are dropped by the filter anyway.
+        avg = np.where(n_seqs > 0, fc_sum / np.maximum(n_seqs, 1), 0.0)
+    return n_seqs, frac, avg
+
 # %% ../nbs/00_core.ipynb #c1120164
 def update_motif_scores_from_unique_hits(
     flexible_motifs_df,
@@ -721,37 +805,41 @@ def update_motif_scores_from_unique_hits(
     Returns:
         pd.DataFrame: A new, filtered DataFrame with updated scores.
     """
-    new_metrics = []
+    if flexible_motifs_df.empty:
+        # No candidates is a normal outcome, not an error -- an RM-deficient strain
+        # reaches here legitimately. Return the empty frame with its columns intact.
+        return flexible_motifs_df.copy()
+
     all_motifs = flexible_motifs_df['motif'].tolist()
 
-    # Pre-compute filter for every motif once to avoid redundant .apply() calls.
-    motif_filters = {}
-    print("  Pre-computing sequence filters for each motif...")
-    for m in tqdm(all_motifs, desc="  Building filters"):
-        motif_filters[m] = _get_filter_for_motif(log2fc_series, m, left_context, right_context)
+    # Which pattern each motif came from, so presence can be read off the window codes.
+    if 'pattern' in flexible_motifs_df.columns:
+        patterns = []
+        for p in flexible_motifs_df['pattern']:
+            try:
+                patterns.append(tuple(ast.literal_eval(p)) if isinstance(p, str) else tuple(p))
+            except (ValueError, SyntaxError):
+                patterns.append(None)
+    else:
+        patterns = [None] * len(all_motifs)
 
-    print("  Scoring motifs on unique hits...")
-    for current_motif in tqdm(all_motifs, desc="  Scoring motifs"):
-        matches_current_filter = motif_filters[current_motif]
+    encoded = encode_library(
+        get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
+    presence, handled = motif_presence_matrix(encoded, all_motifs, patterns)
 
-        matches_other_filter = pd.Series(False, index=log2fc_series.index)
-        for other_motif, other_filter in motif_filters.items():
-            if other_motif != current_motif:
-                matches_other_filter = matches_other_filter | other_filter
+    # Anything the fast path could not encode -- an IUPAC-degenerate motif, or one whose
+    # pattern is unknown -- falls back to the regex search, so the answer is unchanged.
+    fallback = np.flatnonzero(~handled)
+    if len(fallback):
+        print(f"  {len(fallback)} motif(s) need the regex path (IUPAC or unknown pattern)")
+        for j in tqdm(fallback, desc="  Building filters"):
+            presence[:, j] = _get_filter_for_motif(
+                log2fc_series, all_motifs[j], left_context, right_context).to_numpy()
 
-        final_filter = matches_current_filter & ~matches_other_filter
-        filtered_series = log2fc_series[final_filter]
-
-        log2fc_values = filtered_series.values
-        num_sequences = len(log2fc_values)
-        fraction_depleted = score(log2fc_values, thr=flexible_motif_log2fc_thr)
-        avg_log2fc = np.mean(log2fc_values) if num_sequences > 0 else 0.0
-
-        new_metrics.append({
-            'fraction_depleted': fraction_depleted,
-            'num_sequences': num_sequences,
-            'avg_log2fc': avg_log2fc
-        })
+    n_seqs, frac_depleted, avg_log2fc = _unique_hit_stats(
+        presence, log2fc_series.to_numpy(), flexible_motif_log2fc_thr)
+    new_metrics = [{'fraction_depleted': f, 'num_sequences': int(n), 'avg_log2fc': a}
+                   for f, n, a in zip(frac_depleted, n_seqs, avg_log2fc)]
 
     df_updated = flexible_motifs_df.copy()
     metrics_df = pd.DataFrame(new_metrics, index=df_updated.index)

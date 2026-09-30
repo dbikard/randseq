@@ -4,8 +4,8 @@ Runs the two example datasets at fixed settings and asserts the exact motif tabl
 numbers are the contract: any change to the pipeline that moves them is either a bug or a
 deliberate decision that has to be recorded in CHANGELOG.md.
 
-Both datasets are E. coli JJ1886 (Lab.ID 12049) from different sequencing runs — countsTable is
-the earlier run, counts_panel is BB2 — so the two tables must report the *same motifs*. That is
+Both datasets are E. coli JJ1886 from different sequencing runs — countsTable is
+the earlier run, counts_panel a later one — so the two tables must report the *same motifs*. That is
 the point of the canonical-strand rule, and before it they reported every motif on opposite
 strands.
 
@@ -43,7 +43,7 @@ JJ1886 = dict(
     expected_fixed={("GTG", 0): 187, ("AAAG", 12): 42},
 )
 
-S12049 = dict(
+PANEL = dict(
     file="counts_panel.csv.gz",
     seq_col="seq",
     sample="JJ1886_R1",
@@ -77,7 +77,7 @@ def run_case(cfg):
     )
 
 
-@pytest.mark.parametrize("cfg,name", [(JJ1886, "JJ1886"), (S12049, "12049")])
+@pytest.mark.parametrize("cfg,name", [(JJ1886, "JJ1886"), (PANEL, "panel")])
 def test_reference_motifs(cfg, name):
     fixed, flex = run_case(cfg)
 
@@ -107,10 +107,10 @@ def test_both_datasets_agree_on_motifs():
 
     Before canonicalisation these two tables reported every motif on opposite strands.
     """
-    shared = set(JJ1886["expected"]) & set(S12049["expected"])
-    assert shared == set(JJ1886["expected"]) == set(S12049["expected"]), (
+    shared = set(JJ1886["expected"]) & set(PANEL["expected"])
+    assert shared == set(JJ1886["expected"]) == set(PANEL["expected"]), (
         "The two JJ1886 datasets no longer agree on motif labels: "
-        f"{set(JJ1886['expected']) ^ set(S12049['expected'])}"
+        f"{set(JJ1886['expected']) ^ set(PANEL['expected'])}"
     )
 
 

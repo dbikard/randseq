@@ -56,19 +56,27 @@ It is regenerable (`nbdev-readme` rewrites it from `index.ipynb`), but it has to
 the README to render. Now tracked. Regenerate and re-commit it whenever `index.ipynb`'s output
 changes; the current one is up to date, showing canonical-strand motif names.
 
-## 4. The string-based reference scanner
+## 4. The string-based reference scanner — moved out of the package
 
-`get_sites_in_seq`, `get_fold_change_values_per_site`, `get_sites_scores` are a second,
-slower implementation of the pattern scan. They look like dead weight but they are not: the
-notebook uses them to prove the vectorized scan gives identical answers on every pattern of both
-example datasets. That equivalence check is the only thing standing behind the claim that
-optimising the scan did not change the science.
+`get_sites_in_seq`, `get_fold_change_values_per_site`, `get_sites_scores` and
+`_make_regex_group_str` were a second, slower implementation of the pattern scan, exported from
+`randseq.core`.
 
-**Decided: keep, and said so in the notebook.** The markdown above `encode_library` in
-`00_core.ipynb` now states that the slow path is deliberate — it is the only independent check
-that vectorising the scan changed no number, it is written to be obviously correct rather than
-fast, and deleting it makes the equivalence check untestable. They stay exported so the check can
-run as an ordinary notebook cell under `nbdev-test`.
+An earlier version of this plan recommended keeping them exported and documenting why. DB
+overruled that, and the rule is better: *old implementations kept only as a reference do not
+belong in the main notebooks and modules.* A reader of `00_core.ipynb` should not have to work
+out that two of the scan implementations they are reading are dead, and `randseq.core.__all__`
+should not advertise functions nobody should call.
+
+They now live in **`tests/reference_scan.py`**, outside the package and not importable from
+`randseq`. The equivalence check moved with them, out of the notebook and into
+**`tests/test_reference_scan.py`**, where it is stronger than it was: the two implementations
+are now compared on four patterns of a real library, on ragged input containing `N`, and on 25
+randomly generated libraries, rather than on a fixed handful of cases.
+
+`00_core.ipynb` keeps one paragraph saying the old implementation exists, where it lives, and
+that its only job is to be the independent check that vectorising the scan changed no number.
+`randseq/core.py` lost about 200 lines.
 
 ## 5. Small warts from this branch
 
@@ -83,6 +91,6 @@ run as an ordinary notebook cell under `nbdev-test`.
    correction: `index_files/` was kept and committed rather than deleted (see §3).
 2. ~~With the next API change: the `return_pvalues` flag.~~ **Done.**
 3. After Bea migrates: `core_v2.py`, `find_restricted_motifs_mp`.
-4. ~~Decide whether the reference scanner stays public or moves to `tests/`.~~ **Decided: stays.**
+4. ~~Decide whether the reference scanner stays public or moves to `tests/`.~~ **Moved to `tests/`.**
 
 **Only step 3 is left, and it is blocked on Bea.** Everything else in this plan is done.

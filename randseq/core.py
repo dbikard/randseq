@@ -499,6 +499,16 @@ def _pattern_window_codes(encoded_seqs, pattern):
     """
     d1, spacer, d2 = pattern
     width = d1 + spacer + d2
+    # A motif code is a base-4 numeral with d1+d2 digits, and the rejection sentinel is one
+    # past the largest of them, so the whole scheme has to fit in the array's dtype. int32
+    # holds 15 defined bases; the shipped patterns use at most 8. Checked rather than assumed:
+    # on numpy >= 2 the sentinel assignment below happens to raise, but on numpy 1.x the same
+    # assignment wraps silently and every count for this pattern would be quietly wrong.
+    if 4 ** (d1 + d2) > np.iinfo(np.int32).max:
+        raise ValueError(
+            f"pattern {pattern} has {d1 + d2} defined bases; the motif code would overflow "
+            f"int32 (max 15). Such a pattern is not usable anyway: it would need "
+            f"{4 ** (d1 + d2):.3g} counting bins.")
     n_windows = encoded_seqs.shape[1] - width + 1
     codes = np.zeros((encoded_seqs.shape[0], n_windows), dtype=np.int32)
     for j in list(range(d1)) + list(range(d1 + spacer, width)):  # defined positions only

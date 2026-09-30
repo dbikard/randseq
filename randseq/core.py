@@ -1299,6 +1299,12 @@ def find_restricted_motifs(log2fc_series,
             flexible_motif_score_thr=flexible_motif_score_thr
         )
 
+        # Canonicalise before reporting, so the names printed here are the names in the
+        # returned table. A motif and its reverse complement are the same site, and the scan
+        # may have found either; a user who reads GAGACC in the log and then looks for it in
+        # the results would not find it, because the result says GGTCTC.
+        flexible_motifs_results_df = _canonicalise_flexible_motifs(flexible_motifs_results_df)
+
         print(f"\n{len(flexible_motifs_results_df)} motifs remaining:")
         if flexible_motifs_results_df.empty:
             print("No core flexible motifs remained after filtering.")

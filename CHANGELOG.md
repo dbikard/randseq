@@ -2,129 +2,167 @@
 
 ## Unreleased — for Bea, before redoing the figures
 
-Three changes. Two of them move numbers or labels in Fig 3; the third stops a failure that has
-been silently producing junk. Everything below was checked against the real BB2 panel
-(`RandSeq_BB2_log2fc_mean.csv`, the same input `code/fig3/generate_fig3_motifs.py` uses), not
-just the example data.
+Everything below was measured against the real BB2 panel, not just the example data.
+`docs/fig3-comparison.md` has the per-strain detail and how to reproduce it.
 
-### Your scripts keep working
+**The short version: the biology does not change.** All 11 strains that call motifs call exactly
+the same set — none gained, none lost — and `avg_log2fc`, the colour of every Fig 3 heatmap cell,
+moves by at most 0.10. What changes is that the table stops containing junk, motif labels become
+consistent, support counts stop being destroyed, and every call now carries a significance value.
 
-`core_v2` was merged into `core` (commit `b758f8f`). `randseq/core_v2.py` is now a shim that
-re-exports the merged implementations, so
-`from randseq.core_v2 import find_restricted_motifs_mp` still imports. It emits a
-`DeprecationWarning` and will be removed later — please move to `from randseq.core import ...`
-when convenient, but nothing breaks today.
+### Your scripts keep working, but please migrate them
 
-### 1. Motifs are reported on a canonical strand — **labels change, numbers do not**
+`core_v2` was merged into `core`. `randseq/core_v2.py` is a shim and
+`find_restricted_motifs_mp` forwards `cpu_count` to `n_jobs`, both with a `DeprecationWarning`,
+so nothing breaks today. Eight of your scripts use them, each needing the same one-line change:
 
-The library is scanned on both strands, so a motif and its reverse complement always get
-identical statistics. They are one answer, and which of the two got printed was decided by
-whatever order the candidates happened to be in. That is why you saw `GAGACC` in one run and
-`GGTCTC` in another, and `TGGCCGC` vs `GCGGCCA`.
-
-Now the strand is chosen by rule: **use the spelling REBASE uses**; if REBASE knows neither
-strand (most novel motifs), use the alphabetically first. The REBASE Gold Standard list
-(n=983, downloaded 2025-12-03) ships with the package as
-`randseq/data/rebase_gold_standard_motifs.txt`.
-
-Checked on the 21-strain panel: **all 30 motif rows still match one-to-one, `num_sequences` is
-identical, and `avg_log2fc` differs by exactly 0.0.** Only labels move — 15 of 30 rows:
-
-| strain | was | now |
-|---|---|---|
-| 15846, 15852, 15853, 16226 | `GAGACC` | `GGTCTC` |
-| 15846, 15852, 15853, 16226 | `AACNNNNCTTT` | `AAAGNNNNGTT` |
-| 15846, 15852, 15853 | `CACNNNNGTAT` | `ATACNNNNGTG` |
-| 16171 | `GACNNNNGTTT` | `AAACNNNNGTC` |
-| 16171 | `GACNNNNGTTC` | `GAACNNNNGTC` |
-| 16172 | `CTANNNNNNNNTGGG` | `CCCANNNNNNNNTAG` |
-| 16172 | `CTANNNNNNNNTAGG` | `CCTANNNNNNNNTAG` |
-
-**This affects two things downstream.** `methylome_crossref_Fig3.R` matches motif strings after
-reverse-complement expansion, so it should be unaffected — but worth re-running and re-reading
-the near-miss list. And the IUPAC merge (`find_iupac_equivalent_motifs`) groups by string
-similarity, so merged motif names in `..._iupac_merged_mm2.csv` will change spelling even where
-the grouping does not.
-
-**It also fixes a contradiction already in the manuscript.** Results §2 calls the JJ1886 site
-"the low-abundance **BsaI** motif (**GAGACC**)"; Results §3 calls the ST131 site
-"5′-**GGTCTC**-3′ ... the widespread ST131 **Eco31I**". BsaI and Eco31I are isoschizomers —
-`GGTCTC(1/5)` — so that is one site written two ways in one paper. With this change the tool
-says `GGTCTC` everywhere, and §2 should be corrected to match.
-
-Fixed-position motifs are deliberately **not** canonicalised: that table records a motif *at an
-offset*, and an offset only means something on one strand.
-
-### 2. Too many candidates is now an error — **381A / 16223 will now fail instead of returning junk**
-
-When the flexible search produces more than `max_candidates` (default 150), the unique-hit
-rescoring is O(N²) and will not finish. The old behaviour was to warn and return the
-**unfiltered candidate list**, which has exactly the same columns as a real result.
-
-In your current Fig 3 table that is what happened to 16223 (381A): of the 374 rows,
-**344 are unfiltered candidates from that one strain.** They then flow into the IUPAC merge and
-produce motifs like `SSBNNSVNN` and `BNCCNNAGGN`. Nothing published is wrong, because 381A is
-dropped from the figure by hand — but the only thing preventing it is remembering to drop it.
-
-Now it raises `TooManyCandidatesError`, naming the strain's candidate count and suggesting
-which threshold to tighten. The unfiltered candidates are still available on the exception as
-`.candidates` if you want to look at them.
-
-**Practical effect on `generate_fig3_motifs.py`:** it will now raise on 16223 unless you catch
-it. The output becomes **30 rows over 20 strains** — which is the real Fig 3 content, with the
-junk excluded by the tool rather than by hand. Suggested change: wrap the per-strain call in
-`try/except TooManyCandidatesError`, log the strain, and carry on. `work/fig3_motifs.py` in the
-`randseq` working directory does exactly this if you want a copy.
-
-### 3. `num_sequences` is larger than in your April/September runs — the rescoring revert
-
-This one predates these changes (it landed in `b758f8f`) but has not been reported to you yet,
-and it moves numbers you may be about to quote.
-
-The `core_v2` unique-hit rescoring change was reverted, because it lost `ATACNNNNGTG` on
-JJ1886. Rescoring is now done over the full log2FC series again. `avg_log2fc` barely moves
-(max |Δ| = 0.026 across the panel), but support counts go up substantially:
-
-| strain | motif (canonical) | now | your reference |
-|---|---|---|---|
-| 16226 | `AAAGNNNNGTT` | 895 | 659 |
-| 15852 | `AAAGNNNNGTT` | 850 | 629 |
-| 15846 | `AAAGNNNNGTT` | 845 | 627 |
-| 15853 | `AAAGNNNNGTT` | 845 | 626 |
-| 16172 | `CCTANNNNNNNNTAG` | 449 | 404 |
-| 16172 | `CCCANNNNNNNNTAG` | 432 | 398 |
-| 16171 | `AAACNNNNGTC` | 341 | 127 |
-| 16171 | `GAACNNNNGTC` | 99 | 61 |
-
-`AAACNNNNGTC` at 341 vs 127 is a 2.7× difference. **Results §2 still has "n=X, n=X and n=X
-plasmids for the three JJ1886 motifs" as placeholders** — please fill those from a current run,
-not from an older table.
-
-Which of the two counts is *correct* is still open. The revert was chosen because the
-alternative demonstrably lost a real motif, but that is an argument against one option rather
-than a positive case for the other. Settling it needs a case where the right answer is known by
-construction; that is the synthetic fixture in `PLAN.md` phase 0.2, not yet built.
-
-### 4. The search is deterministic — and now tested
-
-Your `code/fig3/README.md` records that the search was not reproducible across runs: under
-`PYTHONHASHSEED` 0/1/2 you saw the same motif on either strand and `num_sequences` swinging
-61/77/80 and 85/85/33.
-
-**That does not reproduce on this version.** We ran the full 21-strain panel at three hash
-seeds: byte-identical output every time. The vectorized numpy scan from `b758f8f` replaced the
-set/dict iteration the old scan depended on. `tests/test_reference_results.py` now pins this,
-so it cannot regress silently.
-
-### Regression test
-
-`tests/test_reference_results.py` asserts the exact motif tables for both example datasets and
-checks determinism across three hash seeds. Run it with the env's own pytest:
-
-```bash
-~/miniconda3/envs/randseq/bin/python -m pytest tests/test_reference_results.py -q
+```python
+# before
+from randseq.core_v2 import find_restricted_motifs_mp
+... find_restricted_motifs_mp(series, left, right, cpu_count=16)
+# after
+from randseq.core import find_restricted_motifs
+... find_restricted_motifs(series, left, right, n_jobs=16)
 ```
 
-Note the two example datasets are both JJ1886 (Lab.ID 12049 *is* JJ1886) from different runs —
-so they are a genuine cross-run replicate. Before canonicalisation they reported every motif on
-opposite strands; they now agree, which the test asserts.
+`docs/cleanup-plan.md` lists the files. The shim is removed once you confirm you have migrated —
+and since your scripts have to be re-run anyway, the change is effectively free.
+
+**One change you must make regardless:** wrap the per-strain call in
+`try/except TooManyCandidatesError`, or `generate_fig3_motifs.py` will stop on 16223 instead of
+producing a table.
+
+---
+
+### 1. 381A no longer contaminates the output
+
+Of the 374 rows in your current Fig 3 table, **344 (92%) come from strain 16223 alone** — that
+strain exceeded `max_candidates`, so the old code returned its *unfiltered candidate list*, which
+has the same columns as a real result. Those rows flow into the IUPAC merge and become motifs
+like `SSBNNSVNN`. Nothing published is wrong because 16223 is dropped from the figure by hand,
+but the only thing preventing it was remembering to.
+
+It now raises. Excluding that strain, both tables have exactly 30 rows.
+
+### 2. Motifs are reported on one strand — labels change, numbers do not
+
+A motif and its reverse complement are the same site and always carry identical statistics, so
+only one should be reported. Which one used to depend on scan order. The rule is now REBASE's
+spelling, falling back to alphabetically first. **17 of 30 rows are relabelled:**
+
+| was | now |
+|---|---|
+| `GAGACC` | `GGTCTC` |
+| `AACNNNNCTTT` | `AAAGNNNNGTT` |
+| `CACNNNNGTAT` | `ATACNNNNGTG` |
+| `CTANNNNNNNNTAGG` | `CCTANNNNNNNNTAG` |
+| `TGGCCGC` | `GCGGCCA` |
+| `TAATNNNNNNNGTCG` | `CGACNNNNNNNATTA` |
+| `GACNNNNGTTC` / `GACNNNNGTTT` | `GAACNNNNGTC` / `AAACNNNNGTC` |
+
+This also settles a contradiction already in the manuscript: Results §2 calls the JJ1886 site
+"the low-abundance **BsaI** motif (**GAGACC**)" and §3 calls the ST131 site
+"5′-**GGTCTC**-3′ … the widespread ST131 **Eco31I**". Those are isoschizomers — one site, two
+spellings. **§2 should be corrected to `GGTCTC`.**
+
+`methylome_crossref_Fig3.R` matches motif strings with reverse-complement expansion so it should
+be unaffected, but 17 labels changed and that is worth confirming rather than assuming. Expect
+IUPAC-merged names in `..._iupac_merged_mm2.csv` to change spelling even where the grouping does
+not.
+
+### 3. Support counts go up, often ten-fold
+
+`num_sequences` counts plasmids carrying **exactly one** candidate motif — a plasmid carrying two
+cannot say which one depleted it, so it is excluded from both. Several descriptions of the *same*
+site therefore destroyed each other's evidence, leaving a real motif with a handful of plasmids
+out of hundreds that contain it.
+
+A new filter removes a candidate whose depletion a stronger candidate already explains, before
+the counting. The evidence comes back:
+
+| strain | motif | before | after |
+|---|---|---|---|
+| 16171 | `AAACNNNNGTC` | 127 | **847** |
+| 16171 | `ACANNNNNATGG` | 42 | **494** |
+| 15846 | `ATACNNNNGTG` | 57 | **449** |
+| 15846 | `CACNNNNGTAC` | 53 | **421** |
+| 15852 | `ATACNNNNGTG` | 91 | **461** |
+
+**Eleven of thirty are unchanged** — every motif in 7083, 7084, 8097, 16175 and 16169, the
+strains with few well-separated motifs that never had redundant descriptions to remove.
+
+The motifs doing the crowding turned out to be the same site at the same spacing, over-specified:
+in LMR_503 the site is `CACNNNNGTAY`, and `TACNNNNGTGG`, `CACTNNAGTA`, `ACACNNNAGTA` and fifteen
+others all decompose to `CAC-NNNN-GTA` with an extra base pinned somewhere that does not matter
+and the `Y` left free. Holding the half-sites fixed and varying only the spacer gives median
+log2FC −1.81 at spacer 4 against −0.03 at every other spacing, with an RM-knockout strain flat
+throughout as a control.
+
+**The `n=X` placeholders in Results §2 can now be filled**, and each call has a q-value to quote
+beside it.
+
+### 4. Every call now has a significance value
+
+Under the null a motif's depleted count is `Binomial(n, p)` where `p` is **that sample's own
+background depletion rate**, corrected across every motif the scan tested (~750,000). Calibrated
+against a permutation test that strips the confident calls and reshuffles the rest: 0.60 expected
+spurious calls against 0.8 measured at n=3–4 on the smaller library, and 0.00 against 0.0 on the
+larger.
+
+All 30 calls in Fig 3 are significant, q from 0 to 9×10⁻⁴². Nothing in that figure is marginal.
+
+**The background rate is new diagnostic information and it changes what a negative result means.**
+It varies 20-fold across the panel:
+
+| strain | background | calls |
+|---|---|---|
+| 8099 | 0.015 | none |
+| 8098 | 0.144 | none |
+| **16223 (381A)** | **0.335** | 1, plus 13 below threshold |
+
+"No motif found" in 8099 is a strong negative. The same words for 8098 are much weaker — a
+seventh of that library is depleted for unrelated reasons, so a weak system could be hiding
+there. Those two statements were previously indistinguishable, and nine strains in Fig 3 report
+no calls.
+
+For 381A it turns a judgement call into a measurement: a third of its library is depleted, its one
+real call sits at q = 3×10⁻⁷⁵, and its other thirteen candidates fall between q = 0.36 and 0.93.
+
+`min_support` default moves 3 → 5, set by that permutation test rather than by taste: motifs with
+3–4 supporting plasmids arise by chance about once per scan on the smaller library and never at 5
+or above. It cannot go higher than 6 without deleting BsaI on JJ1886, which has 6 there.
+
+### 5. Each call is checked for shape
+
+A real site shifts one population of plasmids. A motif that is really a diluted version of another
+is a *mixture* — some plasmids destroyed, the rest untouched — and is bimodal. Sarle's coefficient
+separates them at the conventional 5/9 ≈ 0.556 benchmark: shadows measured 0.647–0.667, every real
+call 0.19–0.47, with BREX at 0.236 despite having the broadest distribution of any real call.
+
+**One row in Fig 3 is flagged:** `CAACNNNNNTCGG` in 7083 at 0.569, marginally over the line. Its
+partner `CAATNNNNNTCGG` is at 0.468 and they differ at one position, so the site is presumably
+`CAAYNNNNNTCGG` and both halves are real. Probably a borderline flag rather than a problem, but it
+is the one row worth a second look.
+
+### 6. The search is deterministic, and much faster
+
+Your `code/fig3/README.md` records the old search as non-deterministic across runs. Confirmed:
+running the old package twice on the same input, 2 of 30 calls differ by ~1.5× (`AAACNNNNGTC`:
+127 vs 191). So part of the difference in §3 is our changes and part is the old code disagreeing
+with itself — the old `n` was not a stable quantity.
+
+The new pipeline is deterministic and `tests/test_reference_results.py` pins it across three hash
+seeds. The 21-strain panel went from **1 h 45 min to a few minutes**; an RM-deficient strain used
+to be the *slow* case, which is exactly what a new user runs first.
+
+---
+
+### Running the tests
+
+```bash
+~/miniconda3/envs/randseq/bin/python -m pytest tests/ -q
+```
+
+Note the two example datasets are both JJ1886 (Lab.ID 12049 *is* JJ1886) from different runs, so
+they are a cross-run replicate. Before the canonical-strand rule they reported every motif on
+opposite strands; the test asserts they now agree.

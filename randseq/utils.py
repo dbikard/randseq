@@ -385,6 +385,17 @@ def filter_symmetric_tuples(list_of_tuples):
 
 # %% ../nbs/01_utils.ipynb #4672972a
 def get_patterns():
+    """The search space: every motif architecture the scan will look for.
+
+    A pattern is `(d1, spacer, d2)` -- defined bases, undefined gap, defined bases. The set
+    returned here covers the architectures REBASE actually records for Type I, II and III
+    systems: contiguous 5-7 bp sites for Type II, and bipartite sites with a 1-8 bp spacer for
+    Type I. Searching every conceivable architecture would cost far more and find nothing extra,
+    since a recognition site that fits none of these is not a recognition site of a known class.
+
+    Pass your own list to `find_restricted_motifs` to search a different space -- a site with an
+    unusually long spacer, say -- at proportionally more cost.
+    """
     patterns = generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,3,4)
     patterns = filter_symmetric_tuples(patterns)
     patterns = sorted(patterns, key=lambda x: (x[0]+x[2], x[1])) 

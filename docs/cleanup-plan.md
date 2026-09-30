@@ -42,19 +42,19 @@ from randseq.core import find_restricted_motifs
 must be re-run anyway, because the results change (see `fig3-comparison.md`), so the migration is
 free in the sense that it happens during work she has to do regardless.
 
-## 2. `old_nbs/` — 16 MB, frozen, unused
+## 2. `old_nbs/` — done
 
-Two notebooks (`241909_David.ipynb`, `old_analysis_David.ipynb`) kept from before the package
-existed. Nothing exports from them and nothing imports them; the phase-1 cleanup confirmed the
-only functions they referenced were removable. They are 16 MB of the repository.
+Deleted; git history keeps it, and the path is gitignored. Nothing referenced it.
 
-**Removal trigger:** none needed — git history keeps them. Delete whenever.
+## 3. `index_files/` — keep it, and it had to be *added*
 
-## 3. `index_files/` — 161 KB of generated output
+An earlier version of this plan said to delete it as regenerable build output. That was wrong.
+`README.md` embeds `index_files/figure-commonmark/cell-4-output-1.png`, so it is the only image on
+the GitHub front page — and it was **untracked**, which means that image had been broken on GitHub.
 
-Rendered artifacts from an old docs build. Regenerable.
-
-**Removal trigger:** none. Delete, and gitignore the path.
+It is regenerable (`nbdev-readme` rewrites it from `index.ipynb`), but it has to be committed for
+the README to render. Now tracked. Regenerate and re-commit it whenever `index.ipynb`'s output
+changes; the current one is up to date, showing canonical-strand motif names.
 
 ## 4. The string-based reference scanner
 
@@ -64,25 +64,25 @@ notebook uses them to prove the vectorized scan gives identical answers on every
 example datasets. That equivalence check is the only thing standing behind the claim that
 optimising the scan did not change the science.
 
-**Recommendation: keep**, but say so explicitly in the module docstring so the next person does
-not delete them as duplication. They are a test fixture that happens to be exported.
-
-**Alternative if the API surface matters more:** move them to `tests/` and stop exporting them.
-That keeps the check and removes three names from the public interface.
+**Decided: keep, and said so in the notebook.** The markdown above `encode_library` in
+`00_core.ipynb` now states that the slow path is deliberate — it is the only independent check
+that vectorising the scan changed no number, it is written to be obviously correct rather than
+fast, and deleting it makes the equivalence check untestable. They stay exported so the check can
+run as an ordinary notebook cell under `nbdev-test`.
 
 ## 5. Small warts from this branch
 
-- `process_single_flexible_pattern(..., return_pvalues=False)` — a flag added so the pipeline
-  can collect every tested p-value for the multiple-testing correction. Cleaner would be to
-  always return both and let callers ignore one; the flag exists only to avoid changing an
-  exported signature. Fold in whenever the signature can change.
-- `randseq.egg-info/` is in the working tree and should be gitignored.
+- ~~`process_single_flexible_pattern(..., return_pvalues=False)`~~ — **done.** The function now
+  always returns `(kept, tested_pvalues)`. Nothing ever called it with the flag off, so this cost
+  nothing; the docstring explains why both are returned.
+- `randseq.egg-info/` — already gitignored and untracked; nothing to do.
 
 ## Suggested order
 
-1. Now, no risk: `old_nbs/`, `index_files/`, gitignore `randseq.egg-info/`.
-2. With the next API change: the `return_pvalues` flag.
+1. ~~Now, no risk: `old_nbs/`, `index_files/`, gitignore `randseq.egg-info/`.~~ **Done** — with one
+   correction: `index_files/` was kept and committed rather than deleted (see §3).
+2. ~~With the next API change: the `return_pvalues` flag.~~ **Done.**
 3. After Bea migrates: `core_v2.py`, `find_restricted_motifs_mp`.
-4. Decide separately whether the reference scanner stays public or moves to `tests/`.
+4. ~~Decide whether the reference scanner stays public or moves to `tests/`.~~ **Decided: stays.**
 
-Only step 3 is blocked on anyone else.
+**Only step 3 is left, and it is blocked on Bea.** Everything else in this plan is done.

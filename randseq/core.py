@@ -620,7 +620,6 @@ def process_single_flexible_pattern(
     flexible_motif_log2fc_thr,
     flexible_motif_score_thr,
     flexible_motif_min_support,
-    return_pvalues=False
 ):
     """
     Scores all motifs of one flexible pattern and keeps the candidates with
@@ -635,20 +634,21 @@ def process_single_flexible_pattern(
         flexible_motif_min_support (int): minimum number of sequences (exclusive).
 
     Returns:
-        pd.DataFrame: candidate motifs with 'motif', 'fraction_depleted', 'num_sequences',
-            'avg_log2fc' and 'pattern' (the pattern as a string).
+        (pd.DataFrame, np.ndarray): the surviving candidates -- 'motif', 'fraction_depleted',
+            'num_sequences', 'avg_log2fc' and 'pattern' (the pattern as a string) -- and the
+            p-value of *every* motif that had enough support to be a test, survivor or not.
+
+    Both are returned because the multiple-testing correction needs the full set of tests, and
+    only this function ever sees it: the candidates that fail the score threshold are discarded
+    here, but they were still tested, and a correction that ignored them would be wrong.
     """
     scores = get_pattern_scores(encoded_library, fc_values_for_flexible_analysis,
                                 current_flex_pattern, log2FC_thr=flexible_motif_log2fc_thr)
     scores['pattern'] = str(current_flex_pattern)
     kept = scores[(scores['fraction_depleted'] >= flexible_motif_score_thr) &
                   (scores['num_sequences'] >= flexible_motif_min_support)]
-    if return_pvalues:
-        # every motif with enough support was a test, and the multiple-testing
-        # correction has to know about all of them, not just the survivors
-        tested = scores[scores['num_sequences'] >= flexible_motif_min_support]
-        return kept, tested['p_value'].to_numpy()
-    return kept
+    tested = scores[scores['num_sequences'] >= flexible_motif_min_support]
+    return kept, tested['p_value'].to_numpy()
 
 # %% ../nbs/00_core.ipynb #e40b436f
 def filter_redundant_patterns(df, score_margin=0.05):
@@ -1198,10 +1198,12 @@ def find_restricted_motifs(log2fc_series,
     if log2fc_series_for_flexible_analysis.empty:
         print("No sequences remaining for flexible motif analysis after filtering.")
         flexible_motifs_results_df = pd.DataFrame(columns=['motif', 'pattern', 'fraction_depleted', 'num_sequences', 'avg_log2fc'])
+        # No pattern was scanned, so no test was performed: an empty p-value set, not the
+        # not-yet-assigned tested_pvalues from the scan below.
         return core_fixed_motifs_df, annotate_significance(
             _canonicalise_flexible_motifs(flexible_motifs_results_df),
             log2fc_series, left_context_str, right_context_str,
-            all_pvalues=tested_pvalues, log2fc_thr=flexible_motif_log2fc_thr,
+            all_pvalues=np.array([]), log2fc_thr=flexible_motif_log2fc_thr,
             q_threshold=q_threshold)
 
     short_sequences_for_flex_analysis = log2fc_series_for_flexible_analysis.index.tolist()
@@ -1226,7 +1228,7 @@ def find_restricted_motifs(log2fc_series,
             process_single_flexible_pattern(
                 p, encoded_library_for_flex, fc_values_for_flexible_analysis,
                 flexible_motif_log2fc_thr, flexible_motif_score_thr,
-                flexible_motif_min_support, return_pvalues=True)
+                flexible_motif_min_support)
             for p in tqdm(flexible_motif_patterns, desc="Scanning patterns")
         ]
     else:
@@ -1236,8 +1238,7 @@ def find_restricted_motifs(log2fc_series,
             fc_values_for_flexible_analysis=fc_values_for_flexible_analysis,
             flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
             flexible_motif_score_thr=flexible_motif_score_thr,
-            flexible_motif_min_support=flexible_motif_min_support,
-            return_pvalues=True)
+            flexible_motif_min_support=flexible_motif_min_support)
         with Pool(processes=n_jobs) as pool:
             # imap preserves pattern order, so the result does not depend on which worker
             # finishes first.

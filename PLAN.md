@@ -388,9 +388,8 @@ pairwise+standalone code: 30/30, 0 extra on 43 patterns; same 11 extra on the wi
    `CACGNNNGTAC`, `CACTNNNGTAC` (the first spacer base of `CACNNNNGTAC` pinned to each base -- the
    ideal example) and `AGGTCTC`, `CGAGACC`, `GGTCTCA` (one base around `GAGACC`). With the current
    demo's three patterns rule 2 drops nothing, so the demo needs the wider pattern list.
-2. **The `00_core` step-3 section is broken until rewritten**: the demo cell
-   `profile = variant_profile(*_variants("CACNNNNGTA", ...))` still calls the deleted `_variants`,
-   so `nbdev-test` fails on `00_core`. Rewrite the section as: intro (one site, several
+2. **Rewrite the `00_core` step-3 prose around the two rules** (the notebook runs: the one demo
+   cell that used the deleted `_variants` now builds its variants directly). New structure: intro (one site, several
    descriptions differing by one position) -> the variant profile (one tool) -> reading a profile
    (`verdict`) -> the positions next to a motif (`_undefined_positions`) -> rule 1 (mixture;
    `ATANNNNTGTG` example) -> rule 2 (extension; example from the exploration, or 7084's
@@ -399,8 +398,8 @@ pairwise+standalone code: 30/30, 0 extra on 43 patterns; same 11 extra on the wi
 3. Then: pytest, `nbdev-test --save` (outputs rule), CHANGELOG entry, the opposite-strand
    sentence DB queried is now in `is_extension`'s docstring.
 
-**Also pending from today:** cfg0 still fails (`CCACNNNAGTA`, step-4 options B/C parked above);
-nothing committed since `6ff2429`.
+**Also pending from today:** cfg0 still fails (`CCACNNNAGTA`, step-4 options B/C parked above).
+Everything above is committed and pushed to `eren` as `09f822f`.
 
 ## Wide-search test case — keep for steps 3 and 4 (DB, 2026-10-13)
 

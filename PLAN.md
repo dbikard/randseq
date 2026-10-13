@@ -16,18 +16,18 @@ the handoff is phases 0.1 / 2.2 / 2.5 plus the strand fix — *not* the full cle
 | 0.2 | example data for the walkthrough | **done** — superseded by a curated 8-strain real panel, see below |
 | 0.3 | slim example data | **done** — 17 MB → 2.8 MB, and 1 illustrative strain → 9 |
 | 1 | remove dead code | **done** — 658 lines, results unchanged |
-| 2.1 | one pipeline function `n_jobs=` | in progress — measuring whether the two semantics differ first |
+| 2.1 | one pipeline function `n_jobs=` | **done** — `7cdeb56`; `_mp` is a deprecated alias |
 | 2.2 | order-independence | **done** — the redundancy filter now sorts deterministically and tie-breaks on the motif, not row position |
 | 2.3 | `filter_to_core_motifs` inversion | **done** — was doubly inverted; no effect on the reference tables |
 | 2.4 | threshold convention | **done** — and it DID move `num_sequences`, contrary to the plan's prediction |
 | 2.5 | `max_candidates` raises | **done** |
-| 2.6 | iterative-rescoring experiment | not done |
-| 3 | notebook walkthrough | not done |
-| 4 | push + tell Bea | **partly** — `CHANGELOG.md` written; commit `7190691` not yet pushed; Bea not contacted |
+| 2.6 | iterative-rescoring experiment | **done** — measured; one pass is the intended semantics (see Phase 2) |
+| 3 | notebook walkthrough | **done** — `00_core` is the walkthrough; both Phase 3 additions are in |
+| 4 | push + tell Bea | **partly** — `eren` is level with `origin/eren`; the 2026-10-13 work is uncommitted; Bea not contacted |
 | — | canonical motif strand | **done** (not in the original plan) |
 | — | `core_v2` compat shim | **done** (not in the original plan) |
 
-Unpushed commits on `eren`: 9 and counting.
+Nothing on `eren` is unpushed (checked 2026-10-13); everything since `6ff2429` is uncommitted.
 
 ### Plan items that turned out to be wrong
 
@@ -60,6 +60,10 @@ None of that applies. On Maestro:
   workaround is gone.
 - **`/local/scratch` is node-local.** A script a compute node must read has to live on shared
   storage — use `../work/`, not the session scratchpad.
+- **Prefix every absolute-path call with `PYTHONNOUSERSITE=1`.** The env sets it as a conda env
+  var, which only `conda activate` / `conda run` apply. Calling `~/miniconda3/envs/randseq/bin/python`
+  directly bypasses it, and numpy and scipy then load from `~/.local/lib/python3.11` (found
+  2026-10-13; same versions there, so no result was affected — but it is not the env).
 - **Call env executables by absolute path.** `~/.local/bin` is first on PATH and wins *even
   inside `conda run -n randseq`*. `~/.local/bin/nbdev-test` is a symlink into another user's
   venv, so `conda run -n randseq nbdev-test` silently runs the wrong interpreter and fails with
@@ -313,3 +317,224 @@ All of this is in `CHANGELOG.md` in a form she can act on. It has not been sent.
   `AACNNNNCTTT`/`AAAGNNNNGTT` and `CACNNNNGTAT`/`ATACNNNNGTG` each give identical `n`, `score`
   and mean on 12049. This is what makes canonicalisation lossless.
 - Example data audited; see phase 0.3 for measured sizes.
+
+## Open questions raised 2026-10-02
+
+1. **Should a motif and its reverse complement share one numerical code?** — **DONE 2026-10-13.**
+   Measured, decided and implemented. Folded *within* a pattern's own code space, for the
+   patterns where the two spellings live there: `spacer == 0` or `d1 == d2` (19 of the 43 in
+   `get_patterns()`, but the code tests the shape per call, so it holds for any pattern a caller
+   passes). The other 24 are untouched — each physical site already produced exactly one code,
+   because a both-strand scan of `(4, 4, 3)` covers the whole shape class and `(3, 4, 4)` is
+   dropped by `filter_symmetric_tuples`. Verified on the real library: `(3, 4, 4)` re-spelled as
+   `(4, 4, 3)` is *exactly* `(4, 4, 3)`, 1,131,980 pairs, zero differences either way. Folding an
+   asymmetric pattern would merge unrelated motifs, so `rc_code_table` raises for one.
+
+   Results: identical on 8 configurations, every column. Scored motif space 750,592 -> 462,624
+   rows (-38%); scan runtime unchanged. `canonical_motif` still runs at reporting, because the
+   fold keeps the smaller code (`GAGACC`) and the literature name is `GGTCTC` — so this did
+   *not* remove the strand rule, only the duplicate rows.
+
+   Left deliberately in place: `_canonicalise_flexible_motifs` still collapses a duplicated pair
+   defensively. The scan can no longer produce one, but a caller who passes both `(4, 4, 3)` and
+   `(3, 4, 4)` explicitly still can.
+
+2. **Step 3 is not monotonic in the pattern set.** Adding `(3, 4, 3)` to a search that already
+   contains `(4, 4, 3)` deletes `ATACNNNNGTG` from JJ1886 — a call with 192 plasmids at a
+   depletion fraction of 1.00 — because the shorter `CACNNNNGTA` (0.89) suppresses it under the
+   "general is not significantly worse" rule at `score_margin=0.2`. Enlarging the search space
+   should not remove a correct answer. Measured 2026-10-02; see the note below for what has been
+   ruled out.
+
+## Notebook tasks raised 2026-10-13 (DB, reading `00_core`)
+
+1. ~~**"The real library" arrives ~22 cells too early, and its lead sentence is false.**~~
+   **DONE 2026-10-13** — moved to just before `process_single_flexible_pattern`, its first use. Cell 14
+   says *"The rest of this section works on the example library rather than three sequences by
+   hand"* — but what follows is the twelve-insert `demo_lib` walkthrough (cells 17–33). `lib` and
+   `fcs` are built at cell 15 and then not touched until cell 37
+   (`process_single_flexible_pattern`). Move the section down to just before its first real use,
+   and rewrite the lead sentence so it hands off to the demo rather than claiming to leave it.
+
+2. ~~**The `motif_occurrences` demo exercises neither rejection rule.**~~ **DONE 2026-10-13** —
+   three-insert demo (clean, `N`-bearing, too short) plus a test cell. `demo_lib` is twelve clean
+   12-mers — no non-ACGT base and no short sequence — so neither the N-rejection nor the
+   short-sequence/padding rejection that the docstring promises is ever shown where the reader
+   meets the function. Add an `N`-bearing insert and a shorter one to the demo, show which
+   windows drop out, and assert both behaviours in a test cell.
+
+3. ~~**Say why the two strands are not collapsed at occurrence time.**~~ **DONE 2026-10-13** —
+   overtaken by the fold itself (Open question 1 above). They now *are* collapsed there, and
+   Step A says why, which pattern shapes it applies to, and that the surviving spelling is
+   decided by the code rather than by biology. The "shape never searched" point was already made
+   in the standalone-test section ("a reported pattern can be one `flexible_motif_patterns` never
+   contains"). Stale fold prose fixed in the same pass: step 3's strand bullet, cells on the
+   step-3 demo ("ten survive" was five), and Step B/C commentary.
+
+## RESUME HERE — state at end of 2026-10-14 session
+
+**Mid-change: step 3 rewritten as two order-free rules (DB approved).** Code done and exported:
+`filter_redundant_patterns` = rule 1 (drop mixtures, `is_mixture`) + rule 2 (drop a one-base
+extension of a rule-1 survivor, new `is_extension`); `_variants` and `report=` deleted. In the
+ablation (`../work/step3_ablation.py`, mode "rule") it gave the same called sets as the old
+pairwise+standalone code: 30/30, 0 extra on 43 patterns; same 11 extra on the wide test case.
+
+**Not yet done:**
+1. ~~Verification~~ **DONE**: identical row for row on the 43-pattern panel (137/137) and the
+   wide test case (46/46). Slightly slower (panel 30 s -> 34 s) because rule 1 now tests every
+   candidate, not only pairwise survivors -- DB asked to keep it fast, so look at this.
+   Rule-2 examples on the notebook's own library (`../work/two_rules_explore.out`): with patterns
+   (6,0,0),(7,0,0),(3,4,3),(3,4,4),(4,3,4),(4,4,4), rule 2 drops `CACANNNGTAC`, `CACCNNNGTAC`,
+   `CACGNNNGTAC`, `CACTNNNGTAC` (the first spacer base of `CACNNNNGTAC` pinned to each base -- the
+   ideal example) and `AGGTCTC`, `CGAGACC`, `GGTCTCA` (one base around `GAGACC`). With the current
+   demo's three patterns rule 2 drops nothing, so the demo needs the wider pattern list.
+2. **The `00_core` step-3 section is broken until rewritten**: the demo cell
+   `profile = variant_profile(*_variants("CACNNNNGTA", ...))` still calls the deleted `_variants`,
+   so `nbdev-test` fails on `00_core`. Rewrite the section as: intro (one site, several
+   descriptions differing by one position) -> the variant profile (one tool) -> reading a profile
+   (`verdict`) -> the positions next to a motif (`_undefined_positions`) -> rule 1 (mixture;
+   `ATANNNNTGTG` example) -> rule 2 (extension; example from the exploration, or 7084's
+   `CCCCNNNNNTTTC` from the panel) -> the filter + demo table. Ablation numbers for the prose: without
+   rule 2's job (pairwise) 91 extra calls; rule 1 alone removes 16164's `GGCGNNNNNNNCGCC`.
+3. Then: pytest, `nbdev-test --save` (outputs rule), CHANGELOG entry, the opposite-strand
+   sentence DB queried is now in `is_extension`'s docstring.
+
+**Also pending from today:** cfg0 still fails (`CCACNNNAGTA`, step-4 options B/C parked above);
+nothing committed since `6ff2429`.
+
+## Wide-search test case — keep for steps 3 and 4 (DB, 2026-10-13)
+
+The default stays the paper's 43 patterns. The wider set
+`get_patterns(contiguous=(4, 8), halves=(2, 5), max_spacer=9)` (68 patterns, 902/983 REBASE
+motifs) is kept as a **test case**: run it, and every call it adds is an example of a redundant
+description steps 3 and 4 should remove. Reproduce with `python ../work/fig3_motifs.py --wide`;
+the reference output is `../work/fig3_wide68_testcase.csv`.
+
+Against published Fig 3 it calls 29/30, loses one and adds 11:
+
+- **ECOR64 (16169), the YGGCCR family.** Loses `GCGGCCA`; adds five 8-mers that all contain
+  YGGCCR -- `GCGGCCGC`, `ACGGCCGC`, `AGTGGCCG`, `CTTGGCCA`, `GCTGGCCA`. Each is a one-base
+  extension that picks out the most depleted plasmids of a weak, degenerate site (YGGCCR, mean
+  log2FC -0.82, below the -1 threshold). The 8-base shape just gives that more ways to happen.
+- **15853, the ACGNNNNNGTTG family.** `ACGNNNNNGTTGC`, `ACAACNNNNNCGT`, `ACGNNNNAGTTG` -- five-base
+  halves and a shifted spacer around one site.
+- **8098.** `CGCNGCGAG`, `CTCGCCGC`, `CTCGCGGA`.
+- **381A (16223)** trips `max_candidates` again (170 > 150).
+
+Rules any fix to steps 3-4 should satisfy on this case: remove all 11 without losing the 30, and
+ideally report the degenerate site (YGGCCR) rather than any of its extensions.
+
+## Search-space size — notes 2026-10-13 (DB: note for later, not decided)
+
+The default was briefly widened to 68 patterns and **reverted to the paper's 43** after the
+wide-search test case above (11 extra calls). Nine defined bases stays available
+(`max_defined=9`: 77 patterns, 911/983) but is not the default: it scans 4.0M motifs instead of
+1.6M, and in our libraries a 9-base site has few carriers (~37 in the 34k-plasmid 150 nt library,
+~1 in the 11.6k-plasmid 20 nt one).
+
+**Does widening change BH when the library cannot support the motifs?** Only motifs with
+`num_sequences >= min_support` count as tests, so it should depend on support -- and it does, but
+more of them clear the filter than intuition suggests. Measured, tests contributed by k=9
+patterns: **2.36M on the 150 nt panel (65% of all tests -- every q roughly x3)**, and **231k on the
+20 nt library (22%)**. On the short library the cause is the flanks: the scan reads
+flank + insert + flank, and a window overlapping the constant vector sequence has those bases
+fixed in every plasmid, so a 9-base motif with 6 bases in the flank has only 64 spellings, each on
+~1/64 of the library. Junction-straddling motifs pass the support filter at any size.
+
+**Done 2026-10-13 (no result change):** step 3 reads variant scores from step 2's per-pattern
+totals (one kernel, each pattern scanned at most once), step 2 decodes only its candidates, and
+the library is encoded once per run (and can be passed in, so a panel encodes it once). 21-strain
+panel 72 s -> 31 s, every row and q-value identical. **Parked:** a multi-strain kernel that reads
+each window once for all strains of a panel (the scan is ~0.5 s per strain now). **For the
+step-4 review:** the `max_candidates` docstring and the `TooManyCandidatesError` message still
+describe a "unique-hit scoring step" that no longer exists.
+
+**Idea, parked: derive the default search space from the library.** Include a shape only if
+`03_design`'s carrier formula predicts enough carriers for this library's size and insert length,
+so the search follows the library rather than a fixed list (and four-base sites are searched in
+short-insert libraries, where they are detectable). The flank effect above means "predicted
+carriers" must be computed for the random part only, or junction motifs would justify every size.
+
+## Settled 2026-10-13 — step 4 is cumulative, ties broken on support
+
+Step 4 now tests each candidate against the union of every stronger survivor, and equal
+depletion fractions are ordered by support rather than mean log2FC. 21-strain panel: 19 strains
+identical, 15853 loses the shadow `ACGTNNNNGTTG` (now 30/30 against published Fig 3, 0 extra),
+381A no longer trips `max_candidates` and calls `CCTNAGG` plus six noise-edge motifs. The support
+tie-break alone changed nothing on the panel or the 8 example configs.
+
+**Still open — `CCACNNNAGTA` on the older JJ1886 run (cfg0, the one failing test).** All 55 of its
+plasmids carry one of the four real sites, yet it survives both changes. The last 2 plasmids it
+keeps after removing `ATACNNNNGTG` and `AAAGNNNNGTT` carry `CACNNNNGTAC`, which has *fewer*
+plasmids (20) and so ranks below it. No pass with an order fixed in advance can catch that: the order is set by each motif's full
+size (55 vs 20), before anything is removed. Measured on cfg0's five motifs
+(`../work/step4_orderings.py`):
+
+- **(B) re-rank every round on what is left** (DB's idea). Each round, take the candidate with the
+  most depleted plasmids not carried by anything already kept. `CCACNNNAGTA` has 2 left after
+  round 1, 1 after round 2, 0 after round 3 -> dropped; the four real sites are kept. This is the
+  natural statement of step 4: each motif must explain destroyed plasmids nothing chosen before
+  it explains.
+- **(C) audit after the pass.** Test every survivor, weakest first, against the union of all the
+  *other* survivors. Same answer here. It also closes a gap (B) leaves: (B) checks a motif only
+  against those taken before it, so a later pick can make an earlier one redundant.
+
+Caveats to measure before choosing: ranking on depleted plasmids *left* favours big motifs, so a
+broad half-depleted motif could be taken before a clean site and explain it away (step 3's mixture
+test should remove such motifs first -- unverified); ranking on fraction left instead lets a
+one-plasmid residue jump the queue. Preferred if pursued: (B) ranked on depleted plasmids left,
+then (C), benchmarked on the 21-strain panel, the 8 example configs and cfg0, watching LMR_503,
+381A and ECOR64. Parked 2026-10-13 while DB reviews steps 2-3.
+
+## Settled 2026-10-02 (measured, not argued)
+
+**Open question 2 above is resolved.** `score_margin` is gone. Step 3 now decides general-vs-
+specific by scoring all four bases at the position two candidates disagree on, and calls a motif a
+mixture only when that set is *bimodal* — some variant below `score_thr` **and** a spread of at
+least `score_thr`. Monotonicity is now a standing benchmark check: adding `(3,4,3)` or `(2,4,4)`
+to JJ1886's search no longer deletes its Type I site. The bimodality half is load-bearing: on
+CFT073 three of four variant sets contain a variant below 0.5 (0.47–0.49) at spreads of 0.11–0.21,
+so a threshold-only rule would delete that strain's only motif.
+
+Each survivor is additionally tested on its own by N-padding, which catches a register-shifted
+shadow (`ATANNNNTGTG` against the real `ATACNNNNGTG`) that no pairwise rule can see, because
+neither motif contains the other.
+
+Benchmark at one parameter set (log2FC < −1, score ≥ 0.5): **30/30 published Fig 3 motifs, 0
+extra, 0 false positives on the 9 silent strains, panel exact, HS BREX recovered at −0.5.**
+`min_support` 3 and 5 give **identical** results everywhere — it is not a sensitive parameter.
+
+### Things tried and rejected — do not redo without new evidence
+
+- **Dropping steps 4 and 5.** They are no-ops on 6 of 7 panel strains, which makes them look
+  removable. They are not: without them sample 15853 gains `AACGNNNNNGTTG`, `ACGGNNNNGTTG` and
+  `ACGTNNNNGTTG`, all more specific versions of the real `ACGNNNNNGTTG`, and 381A gains three
+  motifs. Step 4 tests **independence**, not significance.
+- **Tightening the call to q < 0.01.** Changes nothing, in either configuration. The extras above
+  are statistically solid — their plasmids really are destroyed — so no q threshold removes them.
+  Significance and independence are orthogonal; the q-value cannot substitute for step 4.
+- **A q-value prefilter before step 3.** Cuts 381A's candidates 171 → 33 and touches nothing on
+  the clean strains, which is the right shape for a prefilter. But it does not make steps 4 and 5
+  redundant, and with step 3 now 17× faster the speed motive is largely gone. Not worth the risk
+  to a weak site.
+- **Caching the encoded library.** `encode_library` costs 0.12 s against a 15–45 s run. ~1%.
+
+### Done
+
+- **Step 3's standalone test is batched by pattern.** It was calling `_pattern_window_codes` 552
+  times over 20 distinct patterns on 381A. Now the jobs are collected, `(motif, pattern)` pairs
+  deduplicated, and one `motif_presence_matrix` call issued. 381A's step 3: **40.8 s → 2.4 s**;
+  the test suite: 285 s → 77 s.
+
+### Still open
+
+- The **pairwise** comparisons in step 3 are still one `motif_presence_matrix` call each (68 of
+  them on JJ1886, over 25 patterns). Batchable the same way, but now a small share of a small
+  number.
+- ~~`annotate_significance` double-counts the survivors' p-values in BH.~~ **FIXED 2026-10-13.**
+  It was *anti*-conservative, not conservative as written here: a duplicated p-value takes two
+  ranks and the step-up gives it the better one, so top q-values were up to 2x too small. No call
+  changed on the panel.
+- `avg_log2fc` separates signal from noise on 381A more cleanly than score or q does: the real
+  `CCTNAGG` family runs −1.55 to −2.36, the noise −0.81 to −0.89. The pipeline reports it but
+  never filters on it. Worth considering; not tested.

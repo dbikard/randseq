@@ -28,9 +28,9 @@ from randseq.core import find_restricted_motifs
 `docs/cleanup-plan.md` lists the files. The shim is removed once you confirm you have migrated —
 and since your scripts have to be re-run anyway, the change is effectively free.
 
-**One change you must make regardless:** wrap the per-strain call in
-`try/except TooManyCandidatesError`, or `generate_fig3_motifs.py` will stop on 16223 instead of
-producing a table.
+**Worth doing regardless:** wrap the per-strain call in `try/except TooManyCandidatesError`.
+16223 no longer trips it (see 9 below), but another noisy strain could, and without the guard
+`generate_fig3_motifs.py` would stop instead of producing a table.
 
 ---
 
@@ -42,7 +42,8 @@ has the same columns as a real result. Those rows flow into the IUPAC merge and 
 like `SSBNNSVNN`. Nothing published is wrong because 16223 is dropped from the figure by hand,
 but the only thing preventing it was remembering to.
 
-It now raises. Excluding that strain, both tables have exactly 30 rows.
+It now raises rather than returning junk. Excluding that strain, both tables have exactly 30 rows.
+(Since 9 below, 16223 no longer reaches the limit at all.)
 
 ### 2. Motifs are reported on one strand — labels change, numbers do not
 
@@ -156,6 +157,78 @@ seeds. The 21-strain panel went from **1 h 45 min to a few minutes**; an RM-defi
 to be the *slow* case, which is exactly what a new user runs first.
 
 ---
+
+### 7. A site and its reverse complement are one row, from the scan onwards
+
+Previously the scan emitted `GAGACC` *and* `GGTCTC` — one physical site, two rows carrying
+identical statistics — and they were reconciled later by the strand rule. They are now folded
+onto a single code inside `motif_occurrences`, so the scan emits one row per plasmid per site.
+
+**No reported result changes.** Verified by running 8 configurations (7 panel strains plus
+JJ1886 from the older run) before and after: every motif, pattern, support count, depletion
+fraction and `avg_log2fc` is byte-identical.
+
+Whether the two spellings *can* be folded is a property of the pattern, not a hard-coded list: a
+motif of `(d1, spacer, d2)` reverse-complements into one of `(d2, spacer, d1)`, so they share a
+code space only when `spacer == 0` or `d1 == d2`. For the other patterns there was never anything
+to fold — scanning `(4, 4, 3)` on both strands already finds each site exactly once, which is why
+`get_patterns()` drops `(3, 4, 4)`. Folding those would merge *unrelated* motifs, so
+`rc_code_table` refuses them.
+
+Scan runtime is unchanged (8.7 s → 8.8 s over 43 patterns on 30,108 sequences), but the scored
+motif space drops from 750,592 rows to 462,624 (−38%). `canonical_motif` still runs at reporting:
+folding picks the smaller code, which is `GAGACC`, and the name the literature uses is `GGTCTC`.
+
+### 8. Optional compiled scan: `pip install "randseq[fast]"`
+
+With numba installed, the pattern scan runs as one compiled pass (`randseq.fast`) instead of the
+numpy steps. **Results are identical**: on the 21-strain BB2 panel every row — motif, pattern,
+support, call — matches the numpy run, and `avg_log2fc` differs by at most 5e-15 (summation
+order). Total panel time 279 s -> 67 s on 8 cores; the scan alone is ~13x faster. The first call
+in a process compiles for ~4 s, cached afterwards. Without numba nothing changes, and
+`RANDSEQ_NO_NUMBA=1` forces the numpy path when it is installed. `tests/test_fast_scan.py` holds
+the kernel to the numpy path on all 43 shipped patterns.
+
+### 9. Step 4 tests each motif against everything stronger at once
+
+Step 4 drops a candidate whose depletion is borrowed from stronger ones. It used to test against
+each stronger candidate in turn; it now tests against the **union** of all stronger survivors. A
+description that overlaps several co-occurring sites could keep a depleted residue against each
+of them separately while having no plasmid of its own. Ties in strength are now broken by support
+rather than mean log2FC.
+
+On the 21-strain BB2 panel:
+
+- **19 strains are identical**, motifs and support counts, including LMR_503's four co-occurring
+  motifs.
+- **15853 loses `ACGTNNNNGTTG`**, a more specific shadow, and the panel now matches your published
+  Fig 3 exactly: 30 of 30 calls, none extra (it was 31 with one extra).
+- **16223 (381A) now produces a result** instead of raising: 262 of its 366 candidates are
+  explained away, leaving it under `max_candidates`. It calls `CCTNAGG` (584 plasmids,
+  q = 4e-101), clearly real, plus six calls at q 0.02–0.04 that sit on the noise edge. Treat those
+  six with suspicion.
+
+### 10. q-values: each test counted once
+
+`annotate_significance` added the reported motifs' p-values to the pool of all tested p-values,
+which already contained them. That was not merely a slightly larger denominator: a duplicated
+p-value occupies two ranks, and Benjamini-Hochberg's step-up gives both the better rank, so the
+strongest motifs' q-values were up to **2x too small**. Now each test is counted once. On the
+21-strain panel no call changes; q rises by up to 2x at q ~ 1e-200 and by ~0.3% near the 0.05 cut.
+
+### 11. Defaults now match the paper; mirror patterns searched once; ~2x faster
+
+- **`find_restricted_motifs` defaults** were 2 patterns and score >= 0.7. They are now
+  `get_patterns()` -- the paper's 43 -- and score >= 0.5, the settings the paper and Fig 3 use.
+  Your scripts pass both explicitly, so they are unaffected.
+- **A pattern and its mirror** (`(4, 4, 3)` and `(3, 4, 4)`) find the same sites, since the scan
+  reads both strands. Each pattern is now rewritten to one canonical form and searched once.
+- **`get_patterns()` takes arguments** to widen the search (halves up to 5 bases, spacer up to 9,
+  contiguous 4-8). Wider sets currently add redundant calls at the default thresholds, so the
+  default is unchanged.
+- **Speed, no result change:** the 21-strain panel runs in 31 s instead of 72 s with numba, every
+  row and q-value identical. A library can be encoded once and passed to every strain screened
+  with it (`encoded_library=`).
 
 ### Running the tests
 

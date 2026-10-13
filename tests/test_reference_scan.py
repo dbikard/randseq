@@ -17,7 +17,8 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from randseq.core import encode_library, get_pattern_scores
+from randseq.coding import encode_library
+from randseq.core import get_pattern_scores
 from randseq.example_data import get_example_data_dir
 from randseq.utils import calculate_log2fc, get_lib_seq_context
 from reference_scan import (get_fold_change_values_per_site, get_sites_in_seq,

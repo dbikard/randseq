@@ -9,7 +9,10 @@ it to do analysis. It is kept because it is the only *independent* check that ve
 scan changed no number: it is written to be obviously correct rather than fast, so when the two
 disagree, the fast one is what is wrong. `test_reference_scan.py` is what uses it.
 
-Extracted from randseq/core.py, unchanged, when the package stopped exporting it.
+Extracted from randseq/core.py when the package stopped exporting it. One deliberate change
+since: it folds the two spellings of a self-reverse-complementary site onto one motif, mirroring
+`motif_occurrences`. The rule is restated here in string terms rather than imported, so the two
+implementations stay independent.
 """
 import re
 from collections import defaultdict
@@ -18,7 +21,7 @@ from typing import Callable, Dict, List, Set, Tuple
 import numpy as np
 import pandas as pd
 
-from randseq.core import score
+from randseq.utils import score
 from randseq.utils import revcomp
 
 def _make_regex_group_str(length: int, content_char_class: str = "[ATGC]") -> str:
@@ -65,7 +68,10 @@ def get_sites_in_seq(
     Returns:
         A list of sets. Each set contains unique site strings found in the
         corresponding input sequence. Sites are represented with 'N' for the
-        spacer region (e.g., "ATCNNNNGGC").
+        spacer region (e.g., "ATCNNNNGGC"). When both strands are searched and the
+        pattern is unchanged by reverse complementation, each site is recorded under
+        the lexicographically smaller of its two spellings, so that a site and its
+        reverse complement count as one motif rather than two.
 
     Raises:
         ValueError: If the sequence library is empty.
@@ -133,6 +139,16 @@ def get_sites_in_seq(
             reverse_complement_seq = custom_revcomp(processed_seq)
             sequences_to_scan.append(reverse_complement_seq)
 
+        # A site and its reverse complement are one physical site and must not be counted
+        # twice. The reverse complement of a motif of (d1, spacer, d2) is a motif of
+        # (d2, spacer, d1), so both spellings are motifs of *this* pattern -- and so both turn
+        # up in this scan -- exactly when that swap leaves the shape alone: when d1 == d2, or
+        # when there is no spacer and the motif is one contiguous run, whose reverse complement
+        # is another run of the same length. Then the pair is folded onto its lexicographically
+        # smaller member. Otherwise the rc spelling is a motif of a *different* pattern, never
+        # appears here, and folding would emit a motif of the wrong shape.
+        fold_strands = no_ori and (spacer_len == 0 or defined_len1 == defined_len2)
+
         for target_sequence in sequences_to_scan:
             # Find all matches in the current target sequence (forward or reverse complement)
             # matches will be a list of 3-tuples due to the three capturing groups.
@@ -143,6 +159,8 @@ def get_sites_in_seq(
                 # ignored here for the motif string, which uses a generic 'N' spacer.
                 # If spacer_len is 0, 'N' * 0 is an empty string.
                 site_motif = f"{part1}{'N' * spacer_len}{part2}"
+                if fold_strands:
+                    site_motif = min(site_motif, custom_revcomp(site_motif))
                 current_sequence_sites.add(site_motif)
         
         all_sequence_results.append(current_sequence_sites)

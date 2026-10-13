@@ -6,15 +6,17 @@ Docs: https://dbikard.github.io/randseq/utils.html.md"""
 
 # %% auto #0
 __all__ = ['IUPAC_DNA_TO_BASES', 'IUPAC_DNA_TO_REGEX', 'IUPAC_COMPLEMENT', 'IUPAC_EXPAND', 'IUPAC_COLLAPSE', 'calculate_log2fc',
-           'revcomp', 'get_rebase_motifs', 'canonical_motif', 'get_lib_seq_context', 'check_specific_matches_broad',
-           'find_broad_in_specific', 'get_motif_filter_with_context', 'generate_tuple_combinations',
-           'filter_symmetric_tuples', 'get_patterns', 'get_custom_motif_presence_in_library',
-           'get_log2fc_distribution_by_motif', 'motif_distance', 'merge_motifs', 'find_iupac_equivalent_motifs']
+           'score', 'revcomp', 'get_rebase_motifs', 'canonical_motif', 'get_lib_seq_context',
+           'check_specific_matches_broad', 'find_broad_in_specific', 'get_motif_filter_with_context',
+           'generate_tuple_combinations', 'filter_symmetric_tuples', 'canonical_pattern', 'get_patterns',
+           'get_custom_motif_presence_in_library', 'get_log2fc_distribution_by_motif', 'background_depletion_rate',
+           'benjamini_hochberg', 'motif_pvalues', 'motif_distance', 'merge_motifs', 'find_iupac_equivalent_motifs']
 
 # %% ../nbs/01_utils.ipynb #d56a7712
 import pandas as pd
 import re
 import numpy as np
+from scipy.stats import binom
 import os
 import itertools
 from random import choice
@@ -110,6 +112,25 @@ def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudoco
         print(f"Warning: Reference column '{reference_column}' not found in log2fc_df for dropping.")
         
     return log2fc_df
+
+# %% ../nbs/01_utils.ipynb #62be92ea
+def score(FCs, thr=-1):
+    """Fraction of a motif's plasmids that are depleted below `thr`.
+
+    The depletion score, written out plainly. The pipeline computes this quantity inline over
+    whole arrays rather than calling this on a list, so nothing in `randseq.core` calls it; it
+    is here to be read, and to score a motif's fold changes by hand.
+
+    Args:
+        FCs (list): log2 fold changes of the plasmids carrying the motif.
+        thr (float): a plasmid is depleted when its log2FC is strictly below this.
+
+    Returns:
+        float: the fraction depleted, or 0.0 when no plasmid carries the motif.
+    """
+    if len(FCs) == 0:
+        return 0.0
+    return sum([x < thr for x in FCs]) / len(FCs)
 
 # %% ../nbs/01_utils.ipynb #44e4aa1e
 def revcomp(seq:str):
@@ -384,22 +405,45 @@ def filter_symmetric_tuples(list_of_tuples):
     return filtered_list
 
 # %% ../nbs/01_utils.ipynb #4672972a
-def get_patterns():
-    """The search space: every motif architecture the scan will look for.
+def canonical_pattern(pattern):
+    """The single form of `pattern` the scan uses.
 
-    A pattern is `(d1, spacer, d2)` -- defined bases, undefined gap, defined bases. The set
-    returned here covers the architectures REBASE actually records for Type I, II and III
-    systems: contiguous 5-7 bp sites for Type II, and bipartite sites with a 1-8 bp spacer for
-    Type I. Searching every conceivable architecture would cost far more and find nothing extra,
-    since a recognition site that fits none of these is not a recognition site of a known class.
-
-    Pass your own list to `find_restricted_motifs` to search a different space -- a site with an
-    unusually long spacer, say -- at proportionally more cost.
+    Two kinds of spelling describe the same search. A contiguous motif has no gap, so
+    `(d1, 0, d2)` is just a run of `d1 + d2` bases: `(3, 0, 3)` and `(0, 0, 6)` are `(6, 0, 0)`.
+    And a gapped pattern finds the same sites as its mirror `(d2, spacer, d1)`, because the scan
+    reads both strands -- a site of one is the reverse complement of a site of the other. Of a
+    mirror pair the one with the shorter first half is kept, `(3, 4, 4)` rather than `(4, 4, 3)`.
     """
-    patterns = generate_tuple_combinations(5,7,0,0,0,0) + generate_tuple_combinations(2,4,1,8,3,4)
-    patterns = filter_symmetric_tuples(patterns)
-    patterns = sorted(patterns, key=lambda x: (x[0]+x[2], x[1])) 
-    return patterns
+    d1, spacer, d2 = (int(x) for x in pattern)
+    if spacer == 0:
+        return (d1 + d2, 0, 0)
+    return min((d1, spacer, d2), (d2, spacer, d1))
+
+
+def get_patterns(contiguous=(5, 7), halves=(2, 4), max_spacer=8, min_defined=5, max_defined=8):
+    """The search space: every motif architecture the scan looks for by default.
+
+    A pattern is `(d1, spacer, d2)` -- defined bases, undefined gap, defined bases. The default
+    is the 43-pattern set used in the paper: contiguous sites of 5-7 bases, and gapped sites
+    whose halves are 2-4 bases, with at least 5 defined bases in all and a gap of 1-8. It fits
+    837 of the 983 distinct motifs in the REBASE Gold Standard set shipped with the package
+    (`get_rebase_motifs`).
+
+    The arguments widen it. `get_patterns(contiguous=(4, 8), halves=(2, 5), max_spacer=9)`
+    (68 patterns) fits 902; adding `max_defined=9` (77) fits 911, at 2.4x the motifs scanned. A
+    wider search is not free at the default thresholds: on the 21-strain panel the 68-pattern
+    set adds 11 calls the published Fig 3 does not have -- one-base-longer descriptions of weak
+    or degenerate sites, which steps 3 and 4 do not yet catch -- and loses one. It is kept as a
+    test case for improving those steps, not as the default.
+
+    Every pattern is returned in its `canonical_pattern` form.
+    """
+    patterns = {(k, 0, 0) for k in range(contiguous[0], contiguous[1] + 1)}
+    for a in range(halves[0], halves[1] + 1):
+        for b in range(halves[0], halves[1] + 1):
+            if min_defined <= a + b <= max_defined:
+                patterns.update(canonical_pattern((a, s, b)) for s in range(1, max_spacer + 1))
+    return sorted(patterns, key=lambda p: (p[0] + p[2], p[1], p))
 
 # %% ../nbs/01_utils.ipynb #11cec62c
 def _custom_motif_to_regex(motif):
@@ -519,6 +563,47 @@ def get_log2fc_distribution_by_motif(log2fc_df, left_context, right_context, mot
     )
 
     return long_df
+
+# %% ../nbs/01_utils.ipynb #13ad0a45
+def background_depletion_rate(log2fc_series, log2fc_thr=-1):
+    """The null depletion rate a motif's p-value is taken against: the fraction of all plasmids
+    in this sample whose log2FC is below `log2fc_thr`.
+
+    It is the raw sample-wide rate, so it includes the plasmids destroyed by the strain's real
+    sites -- the null is inflated, and the p-values err on the conservative side. By how much
+    depends on how much of the library the real sites cover: little for most strains, a lot for
+    a strain like 381A, a third of whose library is depleted. Using it needs no knowledge of which
+    motifs are real, which is the point.
+    """
+    v = np.asarray(log2fc_series, dtype=float)
+    return float((v < log2fc_thr).mean()) if len(v) else 0.0
+
+
+def benjamini_hochberg(pvalues):
+    """BH-adjusted q-values. The scan tests every motif of every pattern, so the number of
+    tests is large and sample-specific; correcting for it is not optional."""
+    p = np.asarray(pvalues, dtype=float)
+    n = len(p)
+    if n == 0:
+        return p
+    order = np.argsort(p)
+    ranked = p[order] * n / np.arange(1, n + 1)
+    ranked = np.minimum.accumulate(ranked[::-1])[::-1]
+    out = np.empty(n)
+    out[order] = np.clip(ranked, 0, 1)
+    return out
+
+# %% ../nbs/01_utils.ipynb #6811f6cf
+def motif_pvalues(num_sequences, fraction_depleted, background_rate):
+    """P(at least this many of n plasmids depleted | null), per motif.
+
+    Vectorized over a whole score table; the cost is negligible beside the scan itself.
+    """
+    n = np.asarray(num_sequences, dtype=np.int64)
+    k = np.rint(np.asarray(fraction_depleted, dtype=float) * n).astype(np.int64)
+    if background_rate <= 0:
+        return np.where(k > 0, 0.0, 1.0)
+    return binom.sf(k - 1, n, background_rate)
 
 # %% ../nbs/01_utils.ipynb #17a297ed
 IUPAC_EXPAND = {k: frozenset(v) for k, v in IUPAC_DNA_TO_BASES.items()}

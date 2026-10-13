@@ -30,6 +30,7 @@ dependencies:
       - tqdm~=4.70
       - pyahocorasick~=2.3
       - plotnine~=0.15
+      - numba~=0.68         # optional for users (randseq[fast]); used for development
       # randcount (fastq -> counts) adds nothing beyond pandas
       # pipeline
       - snakemake>=8,<9

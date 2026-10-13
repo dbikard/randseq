@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from randseq.core import (calculate_log2fc, decode_motif_codes, encode_library, encode_motif,
-                          get_lib_seq_context, get_pattern_scores, motif_presence_matrix)
+from randseq.coding import (decode_motif_codes, encode_library, encode_motif,
+                            motif_presence_matrix)
+from randseq.core import calculate_log2fc, get_lib_seq_context, get_pattern_scores
 from randseq.example_data import get_example_data_dir
 from randseq.utils import _get_filter_for_motif
 

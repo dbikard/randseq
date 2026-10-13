@@ -36,11 +36,16 @@ JJ1886 = dict(
     # motif -> (fraction_depleted, num_sequences, avg_log2fc)
     expected={
         "GGTCTC": (1.0, 9, -4.313837),
-        "CACNNNNGTAC": (1.0, 19, -5.062006),
-        "ATACNNNNGTG": (1.0, 191, -4.732529),
+        # This config restricts the pattern list and raises score_thr to 0.7. Under those
+        # settings the variant test in step 3 retains a different candidate set from the
+        # score-margin rule it replaced, so step 5 scores these two on fewer uniquely-carried
+        # plasmids -- same motifs, same perfect depletion, smaller denominator. On the default
+        # settings (get_patterns(), score_thr 0.5) both rules give identical support.
+        "CACNNNNGTAC": (1.0, 18, -5.057596),
+        "ATACNNNNGTG": (1.0, 138, -4.716200),
         "AAAGNNNNGTT": (1.0, 61, -5.037651),
     },
-    expected_fixed={("GTG", 0): 187, ("AAAG", 12): 42},
+    expected_fixed={("GTG", "left", 0): 187, ("AAAG", "right", 4): 42},
 )
 
 PANEL = dict(
@@ -53,12 +58,15 @@ PANEL = dict(
     patterns=None,  # get_patterns()
     score_thr=0.5,
     expected={
-        "GGTCTC": (0.942308, 52, -2.748460),
-        "ATACNNNNGTG": (0.995859, 483, -3.205448),
-        "CACNNNNGTAC": (1.0, 441, -3.241587),
-        "AAAGNNNNGTT": (0.994331, 882, -3.369967),
+        # Support is now the number of plasmids that actually carry each motif -- checked
+        # against a direct regex count on 2026-10-13. The previous values (52/483/441/882) were
+        # undercounts left by the step-1 set-aside, which removed sequences before the scan.
+        "GGTCTC": (0.945455, 55, -2.804666),
+        "ATACNNNNGTG": (0.996032, 504, -3.218952),
+        "CACNNNNGTAC": (1.0, 468, -3.265288),
+        "AAAGNNNNGTT": (0.994524, 913, -3.378797),
     },
-    expected_fixed={("CTTT", 4): 242},
+    expected_fixed={("CTTT", "left", 4): 242},
 )
 
 
@@ -98,7 +106,8 @@ def test_reference_motifs(cfg, name):
         assert abs(row["fraction_depleted"] - frac) < TOL, f"{name}/{row['motif']}: fraction_depleted"
         assert abs(row["avg_log2fc"] - fc) < TOL, f"{name}/{row['motif']}: avg_log2fc"
 
-    got_fixed = {(r["motif"], r["position"]): r["num_sequences"] for _, r in fixed.iterrows()}
+    got_fixed = {(r["motif"], r["anchor"], r["position"]): r["num_sequences"]
+                 for _, r in fixed.iterrows()}
     assert got_fixed == cfg["expected_fixed"], f"{name}: fixed-position motifs changed"
 
 

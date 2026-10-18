@@ -60,7 +60,7 @@ def _pattern_window_codes(encoded_seqs, pattern):
             f"pattern {pattern} has {d1 + d2} defined bases; the motif code would overflow "
             f"int32 (max 15). Such a pattern is not usable anyway: it would need "
             f"{4 ** (d1 + d2):.3g} counting bins.")
-    n_windows = encoded_seqs.shape[1] - width + 1
+    n_windows = max(encoded_seqs.shape[1] - width + 1, 0)   # a pattern wider than the sequences has none
     codes = np.zeros((encoded_seqs.shape[0], n_windows), dtype=np.int32)
     for j in list(range(d1)) + list(range(d1 + spacer, width)):  # defined positions only
         codes *= 4

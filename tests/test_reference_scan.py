@@ -1,6 +1,6 @@
 """The vectorized scan must agree with the readable reference implementation.
 
-`randseq.core.get_pattern_scores` replaced a string-based scan with integer motif codes and
+`randseq.fast._get_pattern_scores` replaced a string-based scan with integer motif codes and
 `np.bincount`. That is a large rewrite of the step every downstream number depends on, so it is
 checked against the original rather than trusted: `reference_scan.py` holds the slow version,
 written to be obviously correct, and these tests require the two to agree exactly.
@@ -18,7 +18,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(__file__))
 
 from randseq.coding import encode_library
-from randseq.core import get_pattern_scores
+from randseq.fast import _get_pattern_scores
 from randseq.example_data import get_example_data_dir
 from randseq.utils import calculate_log2fc, get_lib_seq_context
 from reference_scan import (get_fold_change_values_per_site, get_sites_in_seq,
@@ -32,7 +32,7 @@ def assert_same_scores(seqs, fcs, pattern):
     ref = get_sites_scores(
         get_fold_change_values_per_site(get_sites_in_seq(seqs, pattern, no_ori=True), fcs),
         pattern).set_index("motif").sort_index()
-    fast = get_pattern_scores(encode_library(seqs), fcs, pattern).set_index("motif").sort_index()
+    fast = _get_pattern_scores(encode_library(seqs), fcs, pattern).set_index("motif").sort_index()
 
     assert fast.index.tolist() == ref.index.tolist(), f"{pattern}: different motifs found"
     assert fast.num_sequences.tolist() == ref.num_sequences.tolist(), f"{pattern}: support"

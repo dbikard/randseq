@@ -1,7 +1,7 @@
 """The readable reference implementation of the pattern scan.
 
 This is the original, string-based scan: for every sequence it builds a Python set of the motif
-strings matching a pattern, then aggregates fold changes per motif. `randseq.core` computes the
+strings matching a pattern, then aggregates fold changes per motif. `randseq.fast` computes the
 same table with integer codes and `np.bincount`, roughly a hundred times faster.
 
 It lives here, outside the package, because it is not part of the API -- nothing should import
@@ -11,7 +11,7 @@ disagree, the fast one is what is wrong. `test_reference_scan.py` is what uses i
 
 Extracted from randseq/core.py when the package stopped exporting it. One deliberate change
 since: it folds the two spellings of a self-reverse-complementary site onto one motif, mirroring
-`motif_occurrences`. The rule is restated here in string terms rather than imported, so the two
+`_motif_occurrences`. The rule is restated here in string terms rather than imported, so the two
 implementations stay independent.
 """
 import re
@@ -21,8 +21,12 @@ from typing import Callable, Dict, List, Set, Tuple
 import numpy as np
 import pandas as pd
 
-from randseq.utils import score
 from randseq.utils import revcomp
+
+
+def score(FCs, thr=-1):
+    """Fraction of the plasmids carrying a motif whose log2FC is strictly below `thr`; 0.0 for none."""
+    return sum(x < thr for x in FCs) / len(FCs) if len(FCs) else 0.0
 
 def _make_regex_group_str(length: int, content_char_class: str = "[ATGC]") -> str:
     """

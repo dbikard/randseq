@@ -28,8 +28,18 @@ once, and the output is a single table. The notebooks document each step.
   to the sample's median plasmid.
 - `plot_motif_analysis` takes the motif table as `motifs` (was `flexible_motifs_df`).
 - `max_candidates` (default 5000) is checked before step 4 and raises `TooManyCandidatesError`.
-- `get_motif_filter_with_context` and `_custom_motif_to_regex` raise `ValueError` on an invalid
+- `_custom_motif_to_regex`, and the motif lookups built on it, raise `ValueError` on an invalid
   motif instead of matching nothing.
+- A smaller public API. Public: `find_restricted_motifs`, `TooManyCandidatesError` and
+  `call_reason` (`randseq.core`); `calculate_log2fc`, `get_patterns`, `plasmid_background`,
+  `canonical_motif`, `revcomp`, `normalise_motif`, `get_lib_seq_context`,
+  `get_custom_motif_presence_in_library`, `get_log2fc_distribution_by_motif`, and for analysis
+  scripts `generate_tuple_combinations`, `filter_symmetric_tuples` and
+  `find_iupac_equivalent_motifs` (`randseq.utils`); `encode_library` (`randseq.coding`); the
+  plotting and design functions. The pipeline's steps and helpers are private (leading
+  underscore), and the scan of one pattern moved to `randseq.fast`. `score` and
+  `get_motif_filter_with_context` are removed: `get_custom_motif_presence_in_library` is the
+  motif lookup.
 
 ```python
 # before
@@ -73,5 +83,4 @@ motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
   and the library size a site needs), `min_carriers`, and `carrier_fraction` (now exported and
   width-aware for gapped patterns).
 - Optional compiled scan: `pip install "randseq[fast]"` (numba); results are identical.
-- `motif_presence_matrix` fills every column when two motifs share a code.
 - Removed: the unused attic module.

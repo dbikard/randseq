@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 
 from randseq.coding import encode_library
-from randseq.core import (calculate_log2fc, filter_redundant_patterns,
-                          get_lib_seq_context, get_pattern_scores)
+from randseq.core import calculate_log2fc, _filter_redundant_patterns, get_lib_seq_context
+from randseq.fast import _get_pattern_scores
 from randseq.example_data import get_example_data_dir
 
 LEFT, RIGHT = "GTCTAGGGCGGCGGTAAAAC", "ACTAGAGCACCAGAAGTCTA"
@@ -32,7 +32,7 @@ def candidates_for(sample):
     fc = l2.tolist()
     out = []
     for pat in PATTERNS:
-        sc = get_pattern_scores(enc, fc, pat, log2FC_thr=-1)
+        sc = _get_pattern_scores(enc, fc, pat, log2FC_thr=-1)
         sc["pattern"] = str(pat)
         out.append(sc[(sc["fraction_depleted"] >= 0.5) & (sc["num_sequences"] >= 3)])
     return pd.concat(out, ignore_index=True)
@@ -44,10 +44,10 @@ def test_filter_is_independent_of_candidate_order(sample):
     assert not cand.empty, f"{sample} produced no candidates to filter"
     ser = series_for(sample)
     kw = dict(log2fc_thr=-1, score_thr=0.5, min_support=3)
-    expected = set(filter_redundant_patterns(cand.copy(), ser, LEFT, RIGHT, **kw)["motif"])
+    expected = set(_filter_redundant_patterns(cand.copy(), ser, LEFT, RIGHT, **kw)["motif"])
     for seed in range(8):
         shuffled = cand.sample(frac=1.0, random_state=seed).reset_index(drop=True)
-        got = set(filter_redundant_patterns(shuffled, ser, LEFT, RIGHT, **kw)["motif"])
+        got = set(_filter_redundant_patterns(shuffled, ser, LEFT, RIGHT, **kw)["motif"])
         assert got == expected, (
             f"{sample}, shuffle seed {seed}: filtering the same candidates in a different "
             f"order gave a different answer.\n"

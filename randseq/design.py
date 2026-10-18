@@ -13,7 +13,7 @@ import re
 import numpy as np
 import pandas as pd
 from scipy.stats import beta, binom
-from .coding import encode_library, _pattern_window_codes, decode_motif_codes
+from .coding import encode_library, _pattern_window_codes, _decode_motif_codes
 from .utils import revcomp, get_patterns, _custom_motif_to_regex
 
 # %% ../nbs/03_design.ipynb #16319ae6
@@ -119,7 +119,7 @@ def backbone_motif_counts(backbone, patterns, circular=False):
         present = np.flatnonzero(counts[:n_codes])
         if not len(present):
             continue
-        for motif, c in zip(decode_motif_codes(present, pattern), counts[present]):
+        for motif, c in zip(_decode_motif_codes(present, pattern), counts[present]):
             # a palindrome reads identically on both strands, so each site was counted twice
             rows.append(dict(motif=motif, pattern=str(pattern),
                              copies=int(c) // 2 if revcomp(motif) == motif else int(c)))

@@ -21,7 +21,9 @@ $ pip install "randseq[fast] @ git+https://github.com/dbikard/randseq.git"
 
 RandSeq conjugates a library of plasmids with random inserts from a donor into a recipient strain
 and counts each plasmid on both sides. A plasmid that carries a site the recipient’s defences
-recognise is lost. The example data are the 20 nt library in the donor and 19 recipients.
+recognise is lost. The example here, `counts_panel.csv.gz`, is a library of 150 nt random inserts
+counted in the donor (two replicates, `Control_R1` and `Control_R2`) and in 8 recipient strains in
+two replicates each; `counts_panel_key.csv` says what each strain shows.
 
 ``` python
 from randseq.core import find_restricted_motifs
@@ -32,21 +34,21 @@ import pandas as pd
 ```
 
 ``` python
-# Read counts per plasmid: the donor MFDpir and 19 recipient strains, on the 20 nt library
-counts = pd.read_csv(os.path.join(get_example_data_dir(), "countsTable.csv.gz"), index_col=0)
-counts = counts[[col for col in counts.columns if ("_T0" in col) or ("MFDpir" in col)]]
-left, right = "GTCCTAGGTATAATACTAGT", "GTTTTAGAGCTAGAAATAGC"   # vector sequence flanking the insert
+# Read counts per plasmid: the donor library and 8 recipient strains, two replicates each
+counts = pd.read_csv(os.path.join(get_example_data_dir(), "counts_panel.csv.gz"), index_col=0)
+left, right = "GTCTAGGGCGGCGGTAAAAC", "ACTAGAGCACCAGAAGTCTA"   # vector sequence flanking the insert
 
-# log2 fold change of each plasmid in each recipient, against the donor
-log2fc_df = calculate_log2fc(counts, reference_column="MFDpir", count_threshold=20, pseudocount=1)
+# log2 fold change of each plasmid in each sample, against the first donor replicate
+log2fc_df = calculate_log2fc(counts, reference_column="Control_R1")
 ```
 
-[`find_restricted_motifs`](https://dbikard.github.io/randseq/core.html#find_restricted_motifs) searches one recipient’s log2 fold changes for the motifs whose carriers
+[`find_restricted_motifs`](https://dbikard.github.io/randseq/core.html#find_restricted_motifs) searches one sample’s log2 fold changes for the motifs whose carriers
 are depleted. It prints a log of its steps (not shown here) and returns the motifs it calls, in five
-columns. For JJ1886, these are its three restriction-modification sites:
+columns. For JJ1886 these are its three restriction-modification sites, the Type I site written as
+one degenerate motif, `RTACNNNNGTG`:
 
 ``` python
-motifs = find_restricted_motifs(log2fc_df["JJ1886_T0"], left, right)
+motifs = find_restricted_motifs(log2fc_df["JJ1886_R1"], left, right)
 ```
 
 ``` python
@@ -66,15 +68,15 @@ motifs
     }
 </style>
 
-|     | motif       | num_sequences | fraction_depleted | avg_log2fc | q_value       |
-|-----|-------------|---------------|-------------------|------------|---------------|
-| 0   | RTACNNNNGTG | 212           | 1.0               | -4.850774  | 3.828852e-242 |
-| 1   | AAAGNNNNGTT | 63            | 1.0               | -5.209253  | 1.040810e-70  |
-| 2   | GGTCTC      | 9             | 1.0               | -4.363412  | 1.867698e-08  |
+|     | motif       | num_sequences | fraction_depleted | avg_log2fc | q_value      |
+|-----|-------------|---------------|-------------------|------------|--------------|
+| 0   | AAAGNNNNGTT | 913           | 0.997809          | -3.425663  | 0.000000e+00 |
+| 1   | RTACNNNNGTG | 963           | 1.000000          | -3.285517  | 0.000000e+00 |
+| 2   | GGTCTC      | 55            | 0.981818          | -2.851532  | 2.999895e-43 |
 
 </div>
 
-- `num_sequences`: the plasmids carrying the motif.
+- `num_sequences`: the plasmids carrying the motif, of the 30,108 that pass the donor count filter.
 - `fraction_depleted`: the share of them depleted, at log2FC below −0.5 after normalising to the
   sample’s median.
 - `avg_log2fc`: the mean change of the carriers, relative to the sample’s median plasmid.
@@ -85,20 +87,23 @@ motifs
 The plot shows the called motifs’ carriers among all plasmids, and their log2FC distribution:
 
 ``` python
-fig, axes = plot_motif_analysis(counts, "JJ1886_T0", "MFDpir", motifs, left, right)
+fig, axes = plot_motif_analysis(counts, "JJ1886_R1", "Control_R1", motifs, left, right)
 ```
 
 ![](index_files/figure-commonmark/cell-6-output-1.png)
 
-`all_motifs=True` returns every motif that was scored, called or not, with all the diagnostic
-columns and a `reason` for each verdict. JJ1886 has two motifs that were scored but not called:
+`all_motifs=True` returns every motif that was scored, called or not, with the diagnostic columns
+and a `reason` for each verdict. On JJ1886 every scored motif is called. `merged_from` names the
+two variants the Type I site was merged from, and `background`, about 0.13 here, is the rate at
+which plasmids like the carriers deplete anyway:
 
 ``` python
-motifs_all = find_restricted_motifs(log2fc_df["JJ1886_T0"], left, right, all_motifs=True)
+motifs_all = find_restricted_motifs(log2fc_df["JJ1886_R1"], left, right, all_motifs=True)
 ```
 
 ``` python
-motifs_all.loc[~motifs_all.called, ["motif", "num_sequences", "q_value", "reason"]]
+motifs_all[["motif", "num_sequences", "fraction_depleted_lower", "background", "q_value",
+            "merged_from", "reason"]]
 ```
 
 <div>
@@ -114,17 +119,18 @@ motifs_all.loc[~motifs_all.called, ["motif", "num_sequences", "q_value", "reason
     }
 </style>
 
-|  | motif | num_sequences | q_value | reason |
-|----|----|----|----|----|
-| 3 | GTCGNNNNNNNCGGA | 12 | 0.001222 | most carriers not shown depleted (7/12; lower bound 0.32 \< 0.5) |
-| 4 | ACTCNNNNNNGCG | 10 | 0.042920 | most carriers not shown depleted (5/10; lower bound 0.22 \< 0.5) |
+|  | motif | num_sequences | fraction_depleted_lower | background | q_value | merged_from | reason |
+|----|----|----|----|----|----|----|----|
+| 0 | AAAGNNNNGTT | 913 | 0.993120 | 0.131871 | 0.000000e+00 |  | called |
+| 1 | RTACNNNNGTG | 963 | 0.996894 | 0.130708 | 0.000000e+00 | ATACNNNNGTG+CACNNNNGTAC | called |
+| 2 | GGTCTC | 55 | 0.916629 | 0.129596 | 2.999895e-43 |  | called |
 
 </div>
 
-`GTCGNNNNNNNCGGA` is significant, but only 7 of its 12 carriers are depleted, too few to say that
-most are. [Reading the result table](https://dbikard.github.io/randseq/core.html#reading-the-result-table)
-in the core documentation explains p- and q-values, the confidence bound, the background,
-bimodality and the other columns.
+When a scored motif is not called, `reason` names each test it failed, with its numbers.
+[Reading the result table](https://dbikard.github.io/randseq/core.html#reading-the-result-table)
+in the core documentation explains each column, and *The example panel at a glance* there runs
+every strain of the panel.
 
 ## Documentation
 

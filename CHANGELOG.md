@@ -91,3 +91,9 @@ motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
   width-aware for gapped patterns).
 - Optional compiled scan: `pip install "randseq[fast]"` (numba); results are identical.
 - Removed: the unused attic module.
+
+### Known limitations
+
+- A site with an undefined base inside a half-site, such as `CNGTANNNNNNTTC`, has two gaps, and
+  no default pattern describes it. Passing a one-gap shape of its concrete variants in `patterns`
+  (here `(5, 6, 3)`) finds them, reported as separate rows.

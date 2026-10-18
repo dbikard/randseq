@@ -71,9 +71,9 @@ for recipient in recipients:
     try:
         motifs = find_restricted_motifs(
             series, left, right,
-            flexible_motif_patterns=get_patterns(),
-            flexible_motif_log2fc_thr=l2fc_thr,
-            flexible_motif_score_thr=score_thr,
+            patterns=get_patterns(),
+            log2fc_thr=l2fc_thr,
+            score_thr=score_thr,
         )
     except TooManyCandidatesError as e:
         print(f"  skipped: {e.n_candidates} candidates > limit", file=sys.stderr)

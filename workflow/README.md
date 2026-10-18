@@ -56,13 +56,13 @@ snakemake -s workflow/Snakefile --cores 8                           # one machin
 | `motifs.tsv` | the calls, one row per motif per strain |
 | `motifs_skipped.tsv` | strains that produced no confident call, and why |
 | `counts/<sample>_<rep>.tsv` | molecules per library member |
-| `log2fc_mean.tsv` | log2 fold change per plasmid per strain |
+| `log2fc_mean.tsv` | log2 fold change per plasmid per strain, median-normalised (the median plasmid is at 0) |
 | `members.txt` | the library, discovered from the donor |
 
 ### Reading `motifs.tsv`
 
 `median_log2fc` is the headline: how strongly plasmids carrying the motif were depleted, as a
-log2 fold change. `-3` means roughly an 8-fold reduction in successful transfer.
+log2 fold change relative to the strain's median plasmid. `-3` means roughly an 8-fold reduction in successful transfer.
 
 `escaper_rate` is how *penetrant* the restriction is — the fraction of motif-carrying plasmids
 that got through anyway. A low median log2FC with a high escaper rate means a system that blocks

@@ -26,7 +26,8 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, motifs,
     """
     Generates two side-by-side subplots with consistent motif colors:
     1. Scatter plot of normalized counts (sample vs reference).
-    2. Histograms (density) of log2 Fold Change (sample_col / ref_col) for all sequences and each motif.
+    2. Histograms (density) of log2 Fold Change (sample_col / ref_col) for all sequences and each motif,
+       median-normalised as `calculate_log2fc` returns it.
     If title_main is None, it's auto-generated from sample_col and ref_col.
 
     Returns (fig, axes), or (None, None) when counts_df is empty or lacks either column.

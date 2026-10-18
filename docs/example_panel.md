@@ -5,9 +5,8 @@ as raw UMI counts. Each strain is there because it exercises one behaviour of th
 this page records what each one does so the walkthrough's claims can be checked.
 
 Measured 2026-10-17 (merged motifs 2026-10-18) at the pipeline's defaults: log2FC of replicate R1 against `Control_R1`
-(`calculate_log2fc`, `count_threshold=20`, 30,108 plasmids kept), then
-`find_restricted_motifs(series, left, right)` — `get_patterns()`, median-normalised, depleted below −0.5,
-score 0.5. The motifs called are the rows it returns; the motifs scored but not called come back
+(`calculate_log2fc`, `count_threshold=20`, median-normalised, 30,108 plasmids kept), then
+`find_restricted_motifs(series, left, right)` — `get_patterns()`, depleted below −0.5, score 0.5. The motifs called are the rows it returns; the motifs scored but not called come back
 with `all_motifs=True`.
 
 | strain | motifs called | candidates entering step 4 |

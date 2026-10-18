@@ -53,21 +53,30 @@ _COMPLEMENT = str.maketrans("".join(IUPAC_COMPLEMENT), "".join(IUPAC_COMPLEMENT.
 
 
 # %% ../nbs/01_utils.ipynb #74913579
-def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudocount=1):
+def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudocount=1,
+                     normalize="median"):
     """
     Filters a DataFrame, normalizes columns by sum, calculates log2 fold change
-    relative to a reference column, and drops the reference column.
+    relative to a reference column, drops the reference column and, by default, subtracts each
+    sample's median log2FC.
 
     Args:
         df (pd.DataFrame): Input DataFrame (rows=features, columns=samples). NaN counts as 0.
         reference_column (str): Name of the reference sample column.
         count_threshold (int): a feature is kept when its reference count is strictly above this.
         pseudocount (float): Value added to the raw counts, before normalisation.
+        normalize (str): "median" (default) subtracts each sample column's median, so the median
+            plasmid has log2FC 0 (fold change 1): median-ratio normalisation, as in DESeq2. On the
+            log2 scale this is the same as rescaling the counts by the median ratio. "total"
+            stops at each column normalised to its total, so a sample's log2FC are shares
+            relative to the reference's.
 
     Returns:
         pd.DataFrame: DataFrame with log2 fold change values. None if reference
                       column is missing. Empty DataFrame if all rows are filtered out.
     """
+    if normalize not in ("median", "total"):
+        raise ValueError(f"normalize must be 'median' or 'total', not {normalize!r}")
 
     df = df.replace(np.nan,0)
     if reference_column not in df.columns:
@@ -102,6 +111,10 @@ def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudoco
         log2fc_df = log2fc_df.drop(columns=[reference_column])
     else:
         print(f"Warning: Reference column '{reference_column}' not found in log2fc_df for dropping.")
+
+    # 6. Median-ratio normalisation: the median plasmid of each sample has log2FC 0.
+    if normalize == "median":
+        log2fc_df = log2fc_df - log2fc_df.median()
 
     return log2fc_df
 
@@ -557,7 +570,7 @@ def plasmid_background(sequences, log2fc, log2fc_thr=-1):
     Args:
         sequences (list): the inserts, without the vector flanks.
         log2fc (array-like): log2 fold change per insert, in the same order (median-normalised, as
-            `find_restricted_motifs` uses it).
+            `calculate_log2fc` returns it and `find_restricted_motifs` uses it).
         log2fc_thr (float): a plasmid is depleted below this.
 
     Returns:
@@ -701,7 +714,7 @@ def find_iupac_equivalent_motifs(
     - The merged motif is spelled on the strand of the group's first row in `df`.
 
     Args:
-        df: DataFrame with at least *motif_col*, e.g. the flexible motifs returned by
+        df: DataFrame with at least *motif_col*, e.g. the motif table returned by
             find_restricted_motifs. Optional num_sequences / avg_log2fc /
             fraction_depleted columns are aggregated per group.
         max_mismatches: 1 or 2 recommended.

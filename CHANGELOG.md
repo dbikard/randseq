@@ -12,12 +12,20 @@ once, and the output is a single table. The notebooks document each step.
   by q. `all_motifs=True` returns every scored motif, called or not, with all
   the columns and a `reason` for each verdict (`call_reason`). The
   fixed-position scan and its `fixed_motif_*` / `core_motif_score_margin` parameters are gone:
-  the flexible scan reads the vector flanks with each insert, so sites formed across the
-  junction are found directly.
+  the scan reads the vector flanks with each insert, so sites formed across the junction are
+  found directly.
 - `find_restricted_motifs_mp` and `randseq.core_v2` are removed; pass `n_jobs` instead.
-- Defaults: `normalize_median=True`: each sample's log2FC is normalised to its median, so the
-  median plasmid has fold change 1; and a plasmid counts as depleted below −0.5
-  (`flexible_motif_log2fc_thr`).
+- `find_restricted_motifs` parameters renamed, without aliases: `flexible_motif_patterns` →
+  `patterns`, `flexible_motif_log2fc_thr` → `log2fc_thr`, `flexible_motif_score_thr` →
+  `score_thr`, `flexible_motif_min_support` → `min_support`.
+- `calculate_log2fc` median-normalises by default (`normalize="median"`): each sample's median
+  log2FC is subtracted, so the median plasmid has fold change 1 (median-ratio normalisation, as in
+  DESeq2). `normalize="total"` returns the old values, normalised to each sample's total only.
+- `find_restricted_motifs` takes log2FC as given and no longer normalises them; it expects them
+  median-normalised, as `calculate_log2fc` returns them. Values computed elsewhere must be
+  normalised the same way (`series - series.median()`).
+- Default depletion threshold: a plasmid counts as depleted below −0.5 (`log2fc_thr`), relative
+  to the sample's median plasmid.
 - `plot_motif_analysis` takes the motif table as `motifs` (was `flexible_motifs_df`).
 - `max_candidates` (default 5000) is checked before step 4 and raises `TooManyCandidatesError`.
 - `get_motif_filter_with_context` and `_custom_motif_to_regex` raise `ValueError` on an invalid
@@ -26,11 +34,17 @@ once, and the output is a single table. The notebooks document each step.
 ```python
 # before
 from randseq.core_v2 import find_restricted_motifs_mp
-_fixed, flex = find_restricted_motifs_mp(series, left, right, cpu_count=16)
+series = calculate_log2fc(counts, reference_column="MFDpir")["JJ1886_T0"]
+_fixed, flex = find_restricted_motifs_mp(series, left, right, cpu_count=16,
+                                         flexible_motif_log2fc_thr=-1, flexible_motif_score_thr=0.7)
 # after
 from randseq.core import find_restricted_motifs, TooManyCandidatesError
-motifs = find_restricted_motifs(series, left, right, n_jobs=16)              # the calls
+series = calculate_log2fc(counts, reference_column="MFDpir")["JJ1886_T0"]   # median-normalised
+motifs = find_restricted_motifs(series, left, right, n_jobs=16,
+                                log2fc_thr=-1, score_thr=0.7)                # the calls
 motifs_all = find_restricted_motifs(series, left, right, all_motifs=True)    # and the rest
+# log2FC from your own code: normalise them to the median first
+motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
 ```
 
 ### Calling
@@ -40,7 +54,7 @@ motifs_all = find_restricted_motifs(series, left, right, all_motifs=True)    # a
   content in the same sample (`plasmid_background`). q-values are Benjamini–Hochberg over every
   motif tested.
 - A motif is `called` when q < `q_threshold` and the one-sided 95% lower bound on its depleted
-  fraction reaches `flexible_motif_score_thr`. Uncalled rows are in the `all_motifs=True` table.
+  fraction reaches `score_thr`. Uncalled rows are in the `all_motifs=True` table.
 - One description per site: three order-independent rules (step 3) and a test of each candidate
   on the plasmids no stronger candidate explains, held to the scan's own cutoff (step 4).
 - A degenerate site is reported as one IUPAC motif (e.g. `RTACNNNNGTG` rather than two variant

@@ -3,6 +3,9 @@
 log2FC is computed within each replicate first and then averaged, i.e. the geometric mean of the
 fold changes. Doing it this way means each replicate is normalised against its own donor, so a
 difference in sequencing depth between replicates does not leak into the result.
+
+`calculate_log2fc` median-normalises each replicate, and the mean is normalised to its median once
+more, so that every strain's median plasmid is at 0 in the table `find_restricted_motifs` reads.
 """
 import sys
 from pathlib import Path
@@ -50,6 +53,9 @@ common = set(per_rep[0].index)
 for r in per_rep[1:]:
     common &= set(r.index)
 mean = mean.loc[sorted(common)]
+# The mean of median-normalised replicates is not itself at median 0 (and the intersection drops
+# plasmids), so it is normalised again: find_restricted_motifs takes log2FC as given.
+mean = mean - mean.median()
 
 print(f"\n{len(mean)} plasmids measured in all {len(per_rep)} replicates", file=sys.stderr)
 mean.index.name = "seq"

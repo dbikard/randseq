@@ -9,8 +9,8 @@ __all__ = ['LR_THRESHOLD', 'BIMODALITY_BENCHMARK', 'motif_occurrences', 'scan_pa
            'process_single_flexible_pattern', 'variant_profile', 'verdict', 'is_mixture', 'is_extension', 'motif_shape',
            'parent_motifs', 'relax_positions', 'site_or_background', 'classify_bases', 'classify_positions',
            'is_over_specified', 'motif_instances', 'filter_redundant_patterns', 'filter_explained_candidates',
-           'bimodality_coefficient', 'upper_group_median', 'annotate_significance', 'generalise_motif',
-           'merge_degenerate_calls', 'call_reason', 'TooManyCandidatesError', 'find_restricted_motifs']
+           'bimodality_coefficient', 'annotate_significance', 'generalise_motif', 'merge_degenerate_calls',
+           'call_reason', 'TooManyCandidatesError', 'find_restricted_motifs']
 
 # %% ../nbs/00_core.ipynb #ef76c820
 import ast
@@ -156,28 +156,28 @@ def get_pattern_scores(encoded_library, fc_values, pattern, log2FC_thr=-1,
 
 # %% ../nbs/00_core.ipynb #0b75ece4
 def process_single_flexible_pattern(
-    current_flex_pattern,
+    pattern,
     encoded_library,
-    fc_values_for_flexible_analysis,
+    fc_values,
     background,
-    flexible_motif_log2fc_thr,
-    flexible_motif_score_thr,
-    flexible_motif_min_support,
+    log2fc_thr,
+    score_thr,
+    min_support,
     parallel=True,
 ):
     """
-    Scores all motifs of one flexible pattern and keeps the candidates with
-    fraction_depleted >= flexible_motif_score_thr and num_sequences >= flexible_motif_min_support.
+    Scores all motifs of one pattern and keeps the candidates with
+    fraction_depleted >= score_thr and num_sequences >= min_support.
 
     Args:
-        current_flex_pattern (tuple): (d1, spacer, d2) motif pattern.
+        pattern (tuple): (d1, spacer, d2) motif pattern.
         encoded_library (tuple): (fwd, rc) arrays from `encode_library` (sequences with context).
-        fc_values_for_flexible_analysis (list): log2FC of each sequence, in library order.
+        fc_values (list): log2FC of each sequence, in library order.
         background (np.ndarray): each sequence's expected depletion rate, from
             `plasmid_background`.
-        flexible_motif_log2fc_thr (float): log2FC below which a sequence counts as depleted.
-        flexible_motif_score_thr (float): minimum fraction_depleted (inclusive, `>=`).
-        flexible_motif_min_support (int): minimum number of sequences (inclusive, `>=`).
+        log2fc_thr (float): log2FC below which a sequence counts as depleted.
+        score_thr (float): minimum fraction_depleted (inclusive, `>=`).
+        min_support (int): minimum number of sequences (inclusive, `>=`).
         parallel (bool): passed to `scan_pattern`; False inside a pool worker.
 
     Returns:
@@ -191,17 +191,17 @@ def process_single_flexible_pattern(
     only this function ever sees it: the candidates that fail the score threshold are discarded
     here, but they were still tested, and a correction that ignored them would be wrong.
     """
-    fc = np.asarray(fc_values_for_flexible_analysis, dtype=float)
-    totals = scan_pattern(encoded_library, current_flex_pattern, fc, background,
-                          flexible_motif_log2fc_thr, parallel)
+    fc = np.asarray(fc_values, dtype=float)
+    totals = scan_pattern(encoded_library, pattern, fc, background,
+                          log2fc_thr, parallel)
     n_seqs, n_depleted, bg_sum = totals[0], totals[1], totals[3]
     # Only the candidates are turned into strings; the tests stay arrays. A pattern has up to
     # 4**8 motifs present, and decoding every one of them was most of this step's time.
-    tested = np.flatnonzero(n_seqs >= max(flexible_motif_min_support, 1))
+    tested = np.flatnonzero(n_seqs >= max(min_support, 1))
     frac = n_depleted[tested] / n_seqs[tested]
-    kept = _scores_from_totals(totals, current_flex_pattern,
-                               tested[frac >= flexible_motif_score_thr])
-    kept['pattern'] = str(current_flex_pattern)
+    kept = _scores_from_totals(totals, pattern,
+                               tested[frac >= score_thr])
+    kept['pattern'] = str(pattern)
     return kept, motif_pvalues(n_seqs[tested], frac, bg_sum[tested] / n_seqs[tested]), totals
 
 # %% ../nbs/00_core.ipynb #b4ea79aa
@@ -708,8 +708,8 @@ def filter_explained_candidates(candidates_df, log2fc_series, left_context, righ
     return candidates_df.iloc[keep], {motifs[x]: v for x, v in explanations.items()}
 
 # %% ../nbs/00_core.ipynb #006a8b89
-def _canonicalise_flexible_motifs(df):
-    """Put every motif in a flexible-motif result table on its canonical strand.
+def _canonicalise_motifs(df):
+    """Put every motif in a result table on its canonical strand.
 
     A motif and its reverse complement have identical statistics, so rewriting the label loses
     nothing.
@@ -757,7 +757,7 @@ def bimodality_coefficient(values):
 BIMODALITY_BENCHMARK = 5.0 / 9.0
 
 
-def upper_group_median(values):
+def _upper_group_median(values):
     """Median of the upper group when `values` are split in two at the cut that maximises the
     between-group variance (Otsu's method: two-means in one dimension, on the sorted values).
 
@@ -794,8 +794,8 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
     that survived filtering would be meaningless.
 
     `bimodal` marks carriers that are a mixture of depleted and background-level plasmids: a
-    bimodality coefficient above 5/9 and an upper group (`upper_group_median`) that is not
-    depleted at `log2fc_thr`.
+    bimodality coefficient above 5/9 and, when the carriers are split in two where they separate
+    best, an upper group that is not depleted at `log2fc_thr`.
 
     Nothing is removed. `called` marks the rows whose q-value is below `q_threshold` and whose
     `fraction_depleted_lower` reaches `score_thr`; the rest stay in the table so that a weak
@@ -856,7 +856,7 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
     # Two modes, the upper one at background: destroyed and untouched plasmids mixed. Two
     # depleted modes -- strong and very strong -- are a site, not a mixture.
     out["bimodal"] = (out["bimodality"] > BIMODALITY_BENCHMARK) & \
-        np.array([upper_group_median(v) >= log2fc_thr for v in carriers], dtype=bool)
+        np.array([_upper_group_median(v) >= log2fc_thr for v in carriers], dtype=bool)
 
     return out.sort_values(["called", "q_value"], ascending=[False, True])
 
@@ -966,7 +966,7 @@ def merge_degenerate_calls(table, log2fc_series, left_context, right_context, en
         return table
     rows = _motif_rows([grown[m][0] for m in keep], [grown[m][1] for m in keep], log2fc_series,
                        left_context, right_context, encoded, log2fc_thr)
-    scored = annotate_significance(_canonicalise_flexible_motifs(rows), log2fc_series, left_context,
+    scored = annotate_significance(_canonicalise_motifs(rows), log2fc_series, left_context,
                                    right_context, all_pvalues=all_pvalues, log2fc_thr=log2fc_thr,
                                    q_threshold=q_threshold, encoded=encoded,
                                    background=background, score_thr=score_thr)
@@ -1032,10 +1032,11 @@ class TooManyCandidatesError(RuntimeError):
         super().__init__(
             f"Too many candidate motifs: {n_candidates} > max_candidates={max_candidates}. "
             f"Step 4 compares candidates with each other and would not finish. This usually "
-            f"means the thresholds are too permissive for this sample: check that normalize_median=True, "
-            f"or try a stricter flexible_motif_log2fc_thr (currently {log2fc_thr}, e.g. -1.0), "
-            f"flexible_motif_score_thr (currently {score_thr}, e.g. 0.7), or "
-            f"flexible_motif_min_support (currently {min_support}, e.g. 10). "
+            f"means the thresholds are too permissive for this sample: check that the log2FC are "
+            f"median-normalised, as calculate_log2fc returns them, "
+            f"or try a stricter log2fc_thr (currently {log2fc_thr}, e.g. -1.0), "
+            f"score_thr (currently {score_thr}, e.g. 0.7), or "
+            f"min_support (currently {min_support}, e.g. 10). "
             f"Raise max_candidates only if you know why this strain has so many candidates. "
             f"Step 3's candidates are on this exception as `.candidates`."
         )
@@ -1045,20 +1046,20 @@ def find_restricted_motifs(log2fc_series,
                            left_context_str,
                            right_context_str,
                            n_jobs=1,
-                           flexible_motif_patterns=None,
-                           flexible_motif_log2fc_thr=-0.5,
-                           flexible_motif_min_support=5,
-                           flexible_motif_score_thr=0.5,
+                           patterns=None,
+                           log2fc_thr=-0.5,
+                           min_support=5,
+                           score_thr=0.5,
                            max_candidates=5000,
                            q_threshold=0.05,
                            encoded_library=None,
-                           normalize_median=True,
                            all_motifs=False
                            ):
     """The motifs one sample restricts: steps 2 to 4 and reporting on a log2FC series.
 
-    The series is normalised to its median (`normalize_median`); every pattern is scanned over
-    the inserts with their flanks (step 2); the candidates are reduced to one description per site
+    It expects log2FC as `calculate_log2fc` returns them (median-normalised); normalise your own
+    values the same way if you compute them elsewhere. Every pattern is scanned over the inserts
+    with their flanks (step 2); the candidates are reduced to one description per site
     (`filter_redundant_patterns`, step 3) and cleared of those whose depletion a stronger
     candidate accounts for (`filter_explained_candidates`, step 4); the survivors are put on
     their canonical strand and scored (`annotate_significance`), and the called variants of a
@@ -1067,23 +1068,24 @@ def find_restricted_motifs(log2fc_series,
     decile (`plasmid_background`), and a set of plasmids is tested against their mean.
 
     Args:
-        log2fc_series (pd.Series): log2 fold change, indexed by insert sequence.
+        log2fc_series (pd.Series): log2 fold change, indexed by insert sequence, median-normalised
+            as `calculate_log2fc` returns it. It is used as given.
         left_context_str, right_context_str (str): the vector flanks of the insert.
         n_jobs (int): processes used to scan the patterns. 1 (default) runs in this process.
             A pattern takes about a second on a 30k-sequence library, so more is rarely worth
             the startup cost.
-        flexible_motif_patterns (list): the shapes to search, as `(d1, spacer, d2)`.
+        patterns (list): the shapes to search, as `(d1, spacer, d2)`.
             Defaults to `get_patterns()`. Each is rewritten to its `canonical_pattern` and
             duplicates dropped, so `(4, 4, 3)` is searched as `(3, 4, 4)` and never twice.
-        flexible_motif_log2fc_thr (float): a plasmid counts as depleted below this, after
-            median normalisation. Default -0.5: low enough to see weakly restricting systems such as BREX,
+        log2fc_thr (float): a plasmid counts as depleted below this, relative to the sample's
+            median plasmid. Default -0.5: low enough to see weakly restricting systems such as BREX,
             which a -1 threshold misses.
-        flexible_motif_min_support (int): minimum plasmids for a motif to be considered. With
+        min_support (int): minimum plasmids for a motif to be considered. With
             every carrier depleted, the lower bound on the depleted fraction is 0.22, 0.37, 0.47
             and 0.55 for 2 to 5 carriers, so 5 is the smallest support that can be called at the
             default score threshold of 0.5 (4 at 0.45, 7 at 0.65). Lower only adds candidates and
             runtime: E1114 on the 20 nt library exceeds `max_candidates` at 2 to 4.
-        flexible_motif_score_thr (float): at least this fraction of the plasmids carrying a
+        score_thr (float): at least this fraction of the plasmids carrying a
             candidate must be depleted, and a call must show it with confidence (the lower bound
             `fraction_depleted_lower` reaches it). Default 0.5.
         max_candidates (int): the most candidates step 3 may hand to step 4, whose cost grows
@@ -1097,12 +1099,6 @@ def find_restricted_motifs(log2fc_series,
             left_context_str, right_context_str))`, if the caller already has it. Strains
             screened with the same library and flanks share it, so a panel of strains encodes it once.
             It must describe exactly `log2fc_series.index`, in order.
-        normalize_median (bool): normalise the series to its median before anything is
-            thresholded, so that the median plasmid has a fold change of 1 (median-ratio
-            normalisation, as in DESeq2) rather than normalising to the sample's total. When a few
-            plasmids take a large share of the reads, normalising to the total pushes every other
-            plasmid below 0; with median normalisation a threshold means the same in every strain.
-            `avg_log2fc` is then relative to the sample's median plasmid.
         all_motifs (bool): return every scored motif, called or not, with every column.
 
     Returns:
@@ -1110,14 +1106,12 @@ def find_restricted_motifs(log2fc_series,
         'num_sequences', 'fraction_depleted', 'avg_log2fc', 'q_value'. With `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
         others `annotate_significance` adds, 'merged_from', and 'reason' (`call_reason`).
     """
-    if normalize_median:
-        log2fc_series = log2fc_series - log2fc_series.median()
     candidates = pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences',
                                        'avg_log2fc', 'pattern'])
-    report = functools.partial(annotate_significance, log2fc_thr=flexible_motif_log2fc_thr,
-                               q_threshold=q_threshold, score_thr=flexible_motif_score_thr)
+    report = functools.partial(annotate_significance, log2fc_thr=log2fc_thr,
+                               q_threshold=q_threshold, score_thr=score_thr)
     view = functools.partial(_result_view, all_motifs=all_motifs, q_threshold=q_threshold,
-                             score_thr=flexible_motif_score_thr)
+                             score_thr=score_thr)
     if log2fc_series.empty:
         print("The input series is empty; there is nothing to scan.")
         return view(report(candidates, log2fc_series, left_context_str, right_context_str,
@@ -1133,37 +1127,35 @@ def find_restricted_motifs(log2fc_series,
             f"has {len(log2fc_series)}; it must encode exactly this series' index, in order, "
             f"with these flanks.")
     fc = log2fc_series.to_numpy(dtype=float)
-    background = plasmid_background(log2fc_series.index, fc, flexible_motif_log2fc_thr)
+    background = plasmid_background(log2fc_series.index, fc, log2fc_thr)
 
-    if flexible_motif_patterns is None:
-        flexible_motif_patterns = get_patterns()
-    elif np.ndim(flexible_motif_patterns) == 1:          # one pattern rather than a list
-        flexible_motif_patterns = [flexible_motif_patterns]
+    if patterns is None:
+        patterns = get_patterns()
+    elif np.ndim(patterns) == 1:          # one pattern rather than a list
+        patterns = [patterns]
     # A pattern and its mirror find the same sites (the scan reads both strands), and a gapless
     # pattern is one run however it is split, so each is searched once, in canonical form.
-    for p, c in sorted({(tuple(p), canonical_pattern(p)) for p in flexible_motif_patterns
+    for p, c in sorted({(tuple(p), canonical_pattern(p)) for p in patterns
                         if tuple(p) != canonical_pattern(p)}):
         print(f"Pattern {p} is searched as {c}: the same sites, read on the other strand.")
-    flexible_motif_patterns = sorted({canonical_pattern(p) for p in flexible_motif_patterns},
+    patterns = sorted({canonical_pattern(p) for p in patterns},
                                      key=lambda x: (x[0] + x[2], x[1], x))
 
     # Step 2.
     worker = functools.partial(
         process_single_flexible_pattern, encoded_library=encoded_library,
-        fc_values_for_flexible_analysis=fc, background=background,
-        flexible_motif_log2fc_thr=flexible_motif_log2fc_thr,
-        flexible_motif_score_thr=flexible_motif_score_thr,
-        flexible_motif_min_support=flexible_motif_min_support)
+        fc_values=fc, background=background, log2fc_thr=log2fc_thr,
+        score_thr=score_thr, min_support=min_support)
     if n_jobs == 1:
-        per_pattern = [worker(p) for p in tqdm(flexible_motif_patterns, desc="Scanning patterns")]
+        per_pattern = [worker(p) for p in tqdm(patterns, desc="Scanning patterns")]
     else:
         # Each worker scans single-threaded: n_jobs processes each starting numba's thread pool
         # would ask for n_jobs x cores at once. imap keeps pattern order, so the result does not
         # depend on which worker finishes first.
         with Pool(processes=n_jobs) as pool:
             per_pattern = list(tqdm(pool.imap(functools.partial(worker, parallel=False),
-                                              flexible_motif_patterns),
-                                    total=len(flexible_motif_patterns), desc="Scanning patterns"))
+                                              patterns),
+                                    total=len(patterns), desc="Scanning patterns"))
 
     tested_pvalues = (np.concatenate([pv for _, pv, _ in per_pattern]) if per_pattern
                       else np.array([]))
@@ -1173,7 +1165,7 @@ def find_restricted_motifs(log2fc_series,
     _q = benjamini_hochberg(tested_pvalues)
     scan_cutoff = tested_pvalues[_q < q_threshold].max() if (_q < q_threshold).any() else 0.0
     hits = [df for df, _, _ in per_pattern if not df.empty]
-    totals = {p: t for p, (_, _, t) in zip(flexible_motif_patterns, per_pattern)}
+    totals = {p: t for p, (_, _, t) in zip(patterns, per_pattern)}
 
     # Step 3, once over every pattern's candidates. It scores variants from the scan's counts,
     # so a pattern step 2 scanned is never rescanned.
@@ -1181,21 +1173,21 @@ def find_restricted_motifs(log2fc_series,
         candidates = filter_redundant_patterns(
             pd.concat(hits, ignore_index=True), log2fc_series,
             left_context_str, right_context_str,
-            log2fc_thr=flexible_motif_log2fc_thr, score_thr=flexible_motif_score_thr,
-            min_support=flexible_motif_min_support, encoded=encoded_library, totals=totals,
+            log2fc_thr=log2fc_thr, score_thr=score_thr,
+            min_support=min_support, encoded=encoded_library, totals=totals,
             background=background)
         print(f"{sum(len(h) for h in hits)} candidate(s) across all patterns; "
               f"{len(candidates)} remain after step 3.")
     if len(candidates) > max_candidates:
-        raise TooManyCandidatesError(len(candidates), max_candidates, flexible_motif_log2fc_thr,
-                                     flexible_motif_score_thr, flexible_motif_min_support,
+        raise TooManyCandidatesError(len(candidates), max_candidates, log2fc_thr,
+                                     score_thr, min_support,
                                      candidates)
 
     # Step 4.
     candidates, explained = filter_explained_candidates(
         candidates, log2fc_series, left_context_str, right_context_str,
-        log2fc_thr=flexible_motif_log2fc_thr, score_thr=flexible_motif_score_thr,
-        min_support=flexible_motif_min_support, encoded=encoded_library,
+        log2fc_thr=log2fc_thr, score_thr=score_thr,
+        min_support=min_support, encoded=encoded_library,
         p_threshold=scan_cutoff, background=background)
     if explained:
         print(f"{len(explained)} candidate(s) whose score was borrowed:")
@@ -1203,7 +1195,7 @@ def find_restricted_motifs(log2fc_series,
             print(f"    {m} <- {by} (without them: n={n}, score={s:.2f})")
 
     # Canonicalise before printing, so the names in the log are the names in the table.
-    candidates = _canonicalise_flexible_motifs(candidates)
+    candidates = _canonicalise_motifs(candidates)
     print(f"{len(candidates)} motif(s) scored:")
     for _, row in candidates.iterrows():
         print(f"  {row['motif']} (pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, "
@@ -1214,8 +1206,8 @@ def find_restricted_motifs(log2fc_series,
     # A degenerate site's called variants, reported as one IUPAC motif.
     table = merge_degenerate_calls(
         table, log2fc_series, left_context_str, right_context_str, encoded_library, background,
-        tested_pvalues, log2fc_thr=flexible_motif_log2fc_thr, q_threshold=q_threshold,
-        score_thr=flexible_motif_score_thr, min_support=flexible_motif_min_support, totals=totals)
+        tested_pvalues, log2fc_thr=log2fc_thr, q_threshold=q_threshold,
+        score_thr=score_thr, min_support=min_support, totals=totals)
     merged = table[table["merged_from"] != ""]
     if len(merged):
         print(f"{len(merged)} degenerate site(s) reported as one motif:")

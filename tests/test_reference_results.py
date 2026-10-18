@@ -74,7 +74,7 @@ PANEL = dict(
 )
 
 
-COMPACT = ["motif", "num_sequences", "fraction_depleted", "excess_depleted", "avg_log2fc", "q_value"]
+COMPACT = ["motif", "num_sequences", "fraction_depleted", "avg_log2fc", "q_value"]
 
 
 def run_case(cfg, **kwargs):
@@ -97,7 +97,7 @@ def run_case(cfg, **kwargs):
 def test_reference_motifs(cfg, name):
     motifs = run_case(cfg)
 
-    # The default return is the called motifs alone, in six columns, sorted by q.
+    # The default return is the called motifs alone, in five columns, sorted by q.
     assert list(motifs.columns) == COMPACT
     assert motifs["q_value"].is_monotonic_increasing
     assert set(motifs["motif"]) == set(cfg["expected"]), (

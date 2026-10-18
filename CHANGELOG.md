@@ -2,14 +2,14 @@
 
 ## 0.1.0 (unreleased)
 
-A rework of motif calling. Every call now carries a significance value and an effect size, a
-site is reported once, and the output is a single table. The notebooks document each step.
+A rework of motif calling. Every call now carries a significance value, a site is reported
+once, and the output is a single table. The notebooks document each step.
 
 ### Breaking changes
 
 - `find_restricted_motifs` returns one table, not a `(fixed, flex)` tuple: the called motifs, in
-  six columns (`motif`, `num_sequences`, `fraction_depleted`, `excess_depleted`, `avg_log2fc`,
-  `q_value`), sorted by q. `all_motifs=True` returns every scored motif, called or not, with all
+  five columns (`motif`, `num_sequences`, `fraction_depleted`, `avg_log2fc`, `q_value`), sorted
+  by q. `all_motifs=True` returns every scored motif, called or not, with all
   the columns and a `reason` for each verdict (`call_reason`). The
   fixed-position scan and its `fixed_motif_*` / `core_motif_score_margin` parameters are gone:
   the flexible scan reads the vector flanks with each insert, so sites formed across the
@@ -47,10 +47,9 @@ motifs_all = find_restricted_motifs(series, left, right, all_motifs=True)    # a
 
 ### New columns
 
-`background`, `excess_depleted` (fraction of carriers depleted beyond background),
-`fraction_depleted_lower`, `p_value`, `q_value`, `called`, `bimodality`, `bimodal` (carriers
-split between destroyed and untouched), `merged_from`, `reason`. All but `excess_depleted` and
-`q_value` are in the `all_motifs=True` table only.
+`background` (the carriers' GC-matched depletion rate), `fraction_depleted_lower`, `p_value`,
+`q_value`, `called`, `bimodality`, `bimodal` (carriers split between destroyed and untouched),
+`merged_from`, `reason`. All but `q_value` are in the `all_motifs=True` table only.
 
 ### Other
 

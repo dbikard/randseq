@@ -777,8 +777,8 @@ def upper_group_median(values):
 def annotate_significance(results_df, log2fc_series, left_context, right_context,
                           all_pvalues=None, log2fc_thr=-1, q_threshold=0.05, encoded=None,
                           background=None, score_thr=0.5):
-    """Add fraction_depleted_lower, background, excess_depleted, p_value, q_value, called,
-    bimodality and bimodal to a result table.
+    """Add fraction_depleted_lower, background, p_value, q_value, called, bimodality and bimodal
+    to a result table.
 
     `fraction_depleted_lower` is the one-sided lower confidence bound on the fraction of carriers
     depleted (Clopper-Pearson, at level `q_threshold`). A candidate had to reach `score_thr` --
@@ -788,10 +788,6 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
     `background` is the rate at which the motif's carriers would deplete with no site involved:
     the mean over them of each plasmid's GC-matched background (`plasmid_background`, computed
     from `log2fc_series` when not given). The p-value is taken against it, as in the scan.
-    `excess_depleted` is the fraction of carriers depleted beyond it,
-    (fraction_depleted - background) / (1 - background): 0 when carriers deplete no more than
-    plasmids like them, 1 when every one is destroyed. It measures how strong the effect is; q
-    measures how sure we are of it.
 
     `all_pvalues` are the p-values of every motif the scan tested, which is what the
     Benjamini-Hochberg correction has to be computed over -- correcting only over the handful
@@ -814,15 +810,13 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
         # rows works on every strain that finds something and raises on the ones that do not.
         out = results_df.copy()
         for _c, _dt in (("fraction_depleted_lower", float), ("background", float),
-                        ("excess_depleted", float), ("p_value", float),
-                        ("q_value", float), ("called", bool), ("bimodality", float),
-                        ("bimodal", bool)):
+                        ("p_value", float), ("q_value", float), ("called", bool),
+                        ("bimodality", float), ("bimodal", bool)):
             if _c not in out.columns:
                 out[_c] = pd.Series(dtype=_dt)
         return out
     # Placed beside fraction_depleted below; dropped first so a table can be annotated again.
-    out = results_df.drop(columns=["fraction_depleted_lower", "background", "excess_depleted"],
-                          errors="ignore")
+    out = results_df.drop(columns=["fraction_depleted_lower", "background"], errors="ignore")
     if encoded is None:
         encoded = encode_library(
             get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
@@ -839,7 +833,6 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
     out.insert(at, "fraction_depleted_lower",
                np.where(k > 0, beta.ppf(q_threshold, np.maximum(k, 1), n - k + 1), 0.0))
     out.insert(at + 1, "background", rate)
-    out.insert(at + 2, "excess_depleted", (out["fraction_depleted"] - rate) / (1 - rate))
 
     p = motif_pvalues(out["num_sequences"].to_numpy(), out["fraction_depleted"].to_numpy(), rate)
     out["p_value"] = p
@@ -1007,14 +1000,13 @@ def call_reason(row, q_threshold=0.05, score_thr=0.5):
     return "called; carriers split between depleted and untouched" if row["bimodal"] else "called"
 
 
-_COMPACT_COLUMNS = ["motif", "num_sequences", "fraction_depleted", "excess_depleted", "avg_log2fc",
-                    "q_value"]
+_COMPACT_COLUMNS = ["motif", "num_sequences", "fraction_depleted", "avg_log2fc", "q_value"]
 _FULL_COLUMNS = _COMPACT_COLUMNS + ["pattern", "fraction_depleted_lower", "background", "p_value",
                                     "called", "bimodality", "bimodal", "merged_from"]
 
 
 def _result_view(table, all_motifs, q_threshold, score_thr):
-    """What `find_restricted_motifs` returns: the called rows in six columns, or every row with
+    """What `find_restricted_motifs` returns: the called rows in five columns, or every row with
     its `reason`, called first."""
     if not all_motifs:
         return (table.loc[table["called"], _COMPACT_COLUMNS]
@@ -1111,9 +1103,8 @@ def find_restricted_motifs(log2fc_series,
         all_motifs (bool): return every scored motif, called or not, with every column.
 
     Returns:
-        pd.DataFrame: by default the called motifs, one row each, sorted by q: 'motif',
-        'num_sequences', 'fraction_depleted', 'excess_depleted', 'avg_log2fc', 'q_value'. With
-        `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
+        pd.DataFrame: by default the called motifs, one row each, sorted by q then motif: 'motif',
+        'num_sequences', 'fraction_depleted', 'avg_log2fc', 'q_value'. With `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
         others `annotate_significance` adds, 'merged_from', and 'reason' (`call_reason`).
     """
     if center:

@@ -29,7 +29,9 @@ from randseq.utils import calculate_log2fc
 from randseq.plotting import plot_motif_analysis
 from randseq.example_data import get_example_data_dir
 import pandas as pd
+```
 
+``` python
 # Read counts per plasmid: the donor MFDpir and 19 recipient strains, on the 20 nt library
 counts = pd.read_csv(os.path.join(get_example_data_dir(), "countsTable.csv.gz"), index_col=0)
 counts = counts[[col for col in counts.columns if ("_T0" in col) or ("MFDpir" in col)]]
@@ -40,8 +42,8 @@ log2fc_df = calculate_log2fc(counts, reference_column="MFDpir", count_threshold=
 ```
 
 [`find_restricted_motifs`](https://dbikard.github.io/randseq/core.html#find_restricted_motifs) searches one recipient’s log2 fold changes for the motifs whose carriers
-are depleted. It prints a log of its steps (not shown here) and returns the motifs it calls. For
-JJ1886, these are its three restriction-modification sites:
+are depleted. It prints a log of its steps (not shown here) and returns the motifs it calls, in five
+columns. For JJ1886, these are its three restriction-modification sites:
 
 ``` python
 motifs = find_restricted_motifs(log2fc_df["JJ1886_T0"], left, right)
@@ -64,19 +66,17 @@ motifs
     }
 </style>
 
-|  | motif | num_sequences | fraction_depleted | excess_depleted | avg_log2fc | q_value |
-|----|----|----|----|----|----|----|
-| 0 | RTACNNNNGTG | 212 | 1.0 | 1.0 | -4.850774 | 3.828852e-242 |
-| 1 | AAAGNNNNGTT | 63 | 1.0 | 1.0 | -5.209253 | 1.040810e-70 |
-| 2 | GGTCTC | 9 | 1.0 | 1.0 | -4.363412 | 1.867698e-08 |
+|     | motif       | num_sequences | fraction_depleted | avg_log2fc | q_value       |
+|-----|-------------|---------------|-------------------|------------|---------------|
+| 0   | RTACNNNNGTG | 212           | 1.0               | -4.850774  | 3.828852e-242 |
+| 1   | AAAGNNNNGTT | 63            | 1.0               | -5.209253  | 1.040810e-70  |
+| 2   | GGTCTC      | 9             | 1.0               | -4.363412  | 1.867698e-08  |
 
 </div>
 
 - `num_sequences`: the plasmids carrying the motif.
 - `fraction_depleted`: the share of them depleted, at log2FC below −0.5 after centring on the
   sample’s median.
-- `excess_depleted`: the share depleted beyond what plasmids of similar GC content deplete anyway;
-  0 is no effect, 1 is every carrier destroyed.
 - `avg_log2fc`: the mean change of the carriers, relative to the sample’s typical plasmid.
 - `q_value`: significance, adjusted for the false-discovery rate across the hundreds of thousands
   of motifs tested. A motif is called when q \< 0.05 and most of its carriers are confidently
@@ -88,7 +88,7 @@ The plot shows the called motifs’ carriers among all plasmids, and their log2F
 fig, axes = plot_motif_analysis(counts, "JJ1886_T0", "MFDpir", motifs, left, right)
 ```
 
-![](index_files/figure-commonmark/cell-5-output-1.png)
+![](index_files/figure-commonmark/cell-6-output-1.png)
 
 `all_motifs=True` returns every motif that was scored, called or not, with all the diagnostic
 columns and a `reason` for each verdict. JJ1886 has two motifs that were scored but not called:

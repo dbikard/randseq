@@ -15,8 +15,8 @@ LEFT = "GTCTAGGGCGGCGGTAAAAC"
 RIGHT = "ACTAGAGCACCAGAAGTCT"
 BASES = "ACGT"
 
-# The planted site. GGTCTC is BsaI / Eco31I -- a real Type IIS site, and the one the published
-# screen recovers in JJ1886, so a user who knows the biology can sanity-check the answer.
+# The planted site. GGTCTC is BsaI / Eco31I -- a real Type IIS site, and one that JJ1886 restricts
+# in the package's example data, so a user who knows the biology can sanity-check the answer.
 MOTIF = "GGTCTC"
 RC = "GAGACC"
 

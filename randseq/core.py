@@ -1032,7 +1032,7 @@ class TooManyCandidatesError(RuntimeError):
         super().__init__(
             f"Too many candidate motifs: {n_candidates} > max_candidates={max_candidates}. "
             f"Step 4 compares candidates with each other and would not finish. This usually "
-            f"means the thresholds are too permissive for this sample: check that center=True, "
+            f"means the thresholds are too permissive for this sample: check that normalize_median=True, "
             f"or try a stricter flexible_motif_log2fc_thr (currently {log2fc_thr}, e.g. -1.0), "
             f"flexible_motif_score_thr (currently {score_thr}, e.g. 0.7), or "
             f"flexible_motif_min_support (currently {min_support}, e.g. 10). "
@@ -1052,13 +1052,13 @@ def find_restricted_motifs(log2fc_series,
                            max_candidates=5000,
                            q_threshold=0.05,
                            encoded_library=None,
-                           center=True,
+                           normalize_median=True,
                            all_motifs=False
                            ):
     """The motifs one sample restricts: steps 2 to 4 and reporting on a log2FC series.
 
-    The series is centred on its median; every pattern is scanned over the inserts with their
-    flanks (step 2); the candidates are reduced to one description per site
+    The series is normalised to its median (`normalize_median`); every pattern is scanned over
+    the inserts with their flanks (step 2); the candidates are reduced to one description per site
     (`filter_redundant_patterns`, step 3) and cleared of those whose depletion a stronger
     candidate accounts for (`filter_explained_candidates`, step 4); the survivors are put on
     their canonical strand and scored (`annotate_significance`), and the called variants of a
@@ -1076,7 +1076,7 @@ def find_restricted_motifs(log2fc_series,
             Defaults to `get_patterns()`. Each is rewritten to its `canonical_pattern` and
             duplicates dropped, so `(4, 4, 3)` is searched as `(3, 4, 4)` and never twice.
         flexible_motif_log2fc_thr (float): a plasmid counts as depleted below this, after
-            centring. Default -0.5: low enough to see weakly restricting systems such as BREX,
+            median normalisation. Default -0.5: low enough to see weakly restricting systems such as BREX,
             which a -1 threshold misses.
         flexible_motif_min_support (int): minimum plasmids for a motif to be considered. With
             every carrier depleted, the lower bound on the depleted fraction is 0.22, 0.37, 0.47
@@ -1085,23 +1085,24 @@ def find_restricted_motifs(log2fc_series,
             runtime: E1114 on the 20 nt library exceeds `max_candidates` at 2 to 4.
         flexible_motif_score_thr (float): at least this fraction of the plasmids carrying a
             candidate must be depleted, and a call must show it with confidence (the lower bound
-            `fraction_depleted_lower` reaches it). Default 0.5, the value the draft's Fig 3 uses.
+            `fraction_depleted_lower` reaches it). Default 0.5.
         max_candidates (int): the most candidates step 3 may hand to step 4, whose cost grows
             faster than their number. More raises `TooManyCandidatesError`, with the candidates
-            attached. The default, 5000, is above the 3,144 that the busiest strain of the
-            example data and the BB2 panel brings at the default thresholds.
+            attached. The default, 5000, is above the 3,258 that the busiest strain of the
+            example data brings at the default thresholds.
         q_threshold (float): a motif is marked `called` when its Benjamini-Hochberg q-value,
             computed against its carriers' GC-matched background and over every motif the scan
             tested, falls below this.
         encoded_library (tuple): `encode_library(get_lib_seq_context(log2fc_series.index,
             left_context_str, right_context_str))`, if the caller already has it. Strains
-            screened with the same library and flanks share it, so a panel encodes it once.
+            screened with the same library and flanks share it, so a panel of strains encodes it once.
             It must describe exactly `log2fc_series.index`, in order.
-        center (bool): subtract the series' median before anything is thresholded. The
-            typical untouched plasmid sits below log2FC 0 when a few plasmids take a large share of
-            the reads, so without centring the same threshold would be a different stringency in
-            every strain.
-            `avg_log2fc` is then relative to the sample's own typical plasmid.
+        normalize_median (bool): normalise the series to its median before anything is
+            thresholded, so that the median plasmid has a fold change of 1 (median-ratio
+            normalisation, as in DESeq2) rather than normalising to the sample's total. When a few
+            plasmids take a large share of the reads, normalising to the total pushes every other
+            plasmid below 0; with median normalisation a threshold means the same in every strain.
+            `avg_log2fc` is then relative to the sample's median plasmid.
         all_motifs (bool): return every scored motif, called or not, with every column.
 
     Returns:
@@ -1109,7 +1110,7 @@ def find_restricted_motifs(log2fc_series,
         'num_sequences', 'fraction_depleted', 'avg_log2fc', 'q_value'. With `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
         others `annotate_significance` adds, 'merged_from', and 'reason' (`call_reason`).
     """
-    if center:
+    if normalize_median:
         log2fc_series = log2fc_series - log2fc_series.median()
     candidates = pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences',
                                        'avg_log2fc', 'pattern'])

@@ -78,8 +78,7 @@ compare across runs.
 ## Things that will bite you
 
 **A motif already in your vector cannot be detected.** Every plasmid in the library carries it,
-so there is no motif-free baseline to deplete against. The published screen hit exactly this and
-had to change backbone to recover a masked Type I motif. Set `backbone_fasta` in the config and
+so there is no motif-free baseline to deplete against. Set `backbone_fasta` in the config and
 the pipeline will flag any called motif that occurs in your vector — and, more importantly, tell
 you that a *negative* result for such a motif is meaningless rather than informative.
 
@@ -89,17 +88,18 @@ you that a *negative* result for such a motif is meaningless rather than informa
 this for you; if `motif_coverage` fails, a negative result means "underpowered", not "absent".
 
 **A strain with no restriction system is the *slow* case, not the fast one.** With nothing real
-to find, the search wades through many near-threshold candidates. On the published data one such
-strain ran for over three hours. The pipeline gives motif calling a long time limit, records
+to find, the search wades through many near-threshold candidates. Such a strain can run for
+hours. The pipeline gives motif calling a long time limit, records
 strains that exceed the candidate limit in `motifs_skipped.tsv`, and carries on rather than
 losing the whole run to one sample.
 
-**Thresholds are not universal.** The defaults (`log2FC < -1`, score `>= 0.5`) were tuned on
-Enterobacteriaceae restriction–modification systems. BREX interference is weaker and needs
-`-0.5`. Report whatever you used.
+**Thresholds.** The defaults are the package's: a plasmid counts as depleted below `log2FC -0.5`
+after median normalisation, and a call needs q < 0.05 with most carriers confidently depleted
+(score `>= 0.5`). A stricter threshold such as `-1` misses weaker systems like BREX. Report
+whatever you used.
 
-**Replicates catch contamination.** The published screen excluded strains whose biological
-replicates correlated at r ≤ 0.75. The QC report applies the same rule.
+**Replicates catch contamination.** The QC report flags strains whose biological replicates
+correlate at r ≤ 0.75 (`replicate_r_exclude`).
 
 ## Configuration
 

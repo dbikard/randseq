@@ -1,12 +1,12 @@
 # The example panel
 
-`randseq/example_data/counts_panel.csv.gz` holds eight BB2 strains and both donor replicates,
+`randseq/example_data/counts_panel.csv.gz` holds eight strains and both donor replicates,
 as raw UMI counts. Each strain is there because it exercises one behaviour of the pipeline, and
 this page records what each one does so the walkthrough's claims can be checked.
 
 Measured 2026-10-17 (merged motifs 2026-10-18) at the pipeline's defaults: log2FC of replicate R1 against `Control_R1`
 (`calculate_log2fc`, `count_threshold=20`, 30,108 plasmids kept), then
-`find_restricted_motifs(series, left, right)` — `get_patterns()`, centred, depleted below −0.5,
+`find_restricted_motifs(series, left, right)` — `get_patterns()`, median-normalised, depleted below −0.5,
 score 0.5. The motifs called are the rows it returns; the motifs scored but not called come back
 with `all_motifs=True`.
 
@@ -43,16 +43,11 @@ any other. Both sites are called as two variants each and reported as `GACNNNNGT
 `RAACNNNNGTC`) and `CCAYNNNNNTGT`.
 
 **381A** — a noisy sample: the largest step-4 input of the panel, and a third of its library
-depleted for reasons unrelated to any site. Only the real `CCTNAGG` is called; two weak motifs
-(about half their carriers depleted) are tested against their carriers' GC-matched background and
-stay uncalled; `all_motifs=True` lists them with the reason.
+depleted for reasons unrelated to any site. Only the real `CCTNAGG` is called, against a
+GC-matched background of 0.30.
 
 **EDL933 and EDL933_dRM** — specificity, demonstrated isogenically. The wild type yields
 `CACNNNNNNNCTGG`; its RM knockout yields nothing. A negative result from an unrelated strain
 proves much less than a matched pair.
 
-## Regenerating
-
-`work/build_example_data.py` builds the panel from
-`randseq_paper/data/RandSeq_BB2_UMIcounts_EM_n10_R{1,2}.csv`; `work/after_nofixed.py` reproduces
-the table above (with the 20 nt library and the BB2 panel).
+`00_core`'s *The example panel at a glance* runs every strain and reproduces the table above.

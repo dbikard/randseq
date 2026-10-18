@@ -148,8 +148,8 @@ def rc_code_table(pattern):
     x = (x >> 16) | (x << 16)                                # swap the two halves
     table = ((x >> np.uint32(32 - 2 * k)) ^ np.uint32(4 ** k - 1)).astype(np.int64)
     # A lookup into this, rather than evaluating the formula on every window, because in numpy
-    # each line above is a full pass over the array: on the panel library's 30k x 360
-    # window-code matrix the formula costs about twice the lookup (85 ms vs 45 ms per pattern).
+    # each line above is a full pass over the array: on the 30k x 360 window-code matrix of
+    # the 150 nt example library (`counts_panel.csv.gz`) the formula costs about twice the lookup (85 ms vs 45 ms per pattern).
     # The table is 4**k entries, the same size as the bincount the scan already allocates.
     table.setflags(write=False)           # cached and shared; never mutate in place
     return table

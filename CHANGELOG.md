@@ -15,8 +15,9 @@ once, and the output is a single table. The notebooks document each step.
   the flexible scan reads the vector flanks with each insert, so sites formed across the
   junction are found directly.
 - `find_restricted_motifs_mp` and `randseq.core_v2` are removed; pass `n_jobs` instead.
-- Defaults: each sample is centred on its median (`center=True`) and a plasmid counts as
-  depleted below −0.5 (`flexible_motif_log2fc_thr`).
+- Defaults: `normalize_median=True`: each sample's log2FC is normalised to its median, so the
+  median plasmid has fold change 1; and a plasmid counts as depleted below −0.5
+  (`flexible_motif_log2fc_thr`).
 - `plot_motif_analysis` takes the motif table as `motifs` (was `flexible_motifs_df`).
 - `max_candidates` (default 5000) is checked before step 4 and raises `TooManyCandidatesError`.
 - `get_motif_filter_with_context` and `_custom_motif_to_regex` raise `ValueError` on an invalid

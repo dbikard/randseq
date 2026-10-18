@@ -39,7 +39,7 @@ JJ1886 = dict(
         # direct regex count on 2026-10-15; the earlier values (138/61/18) were undercounts.
         # Rule 3 of step 3 is what removed the shadow CCACNNNAGTA, which used to be called here;
         # holding step 4's leftovers to the scan's cutoff removed ACCTNNNCTTG (2026-10-17).
-        # avg_log2fc is measured from the sample's median since centring became the default.
+        # avg_log2fc is measured from the sample's median since median normalisation became the default.
         # The Type I site was two rows, ATACNNNNGTG (1.0, 192, -4.805313) and CACNNNNGTAC
         # (1.0, 20, -5.287198); since 2026-10-18 its called variants are reported as one IUPAC
         # motif, carried by the 212 plasmids that carry either (CHANGELOG 26).
@@ -61,7 +61,7 @@ PANEL = dict(
     score_thr=0.5,
     expected={
         # Support is the number of plasmids that actually carry each motif (direct regex count,
-        # 2026-10-13). Since 2026-10-15 the defaults centre each series on its median and use
+        # 2026-10-13). Since 2026-10-15 the defaults normalise each series to its median and use
         # log2FC < -0.5: the same four motifs on the same plasmids, with depletion fractions and
         # avg_log2fc now measured from the sample's median. The Type I site was two rows,
         # ATACNNNNGTG (1.0, 504, -3.265818) and CACNNNNGTAC (1.0, 468, -3.312154); since

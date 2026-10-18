@@ -44,8 +44,7 @@ def count_in_backbone(motif):
     """How many times this motif occurs in the vector itself.
 
     A motif already present in the backbone cannot be detected: every plasmid in the library
-    carries it, so there is no motif-free baseline to deplete against. The published screen hit
-    exactly this and had to change backbone to recover a masked Type I motif. Warning about it
+    carries it, so there is no motif-free baseline to deplete against. Warning about it
     is the difference between a negative result and a *meaningless* negative result.
     """
     if backbone is None:

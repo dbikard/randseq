@@ -1,7 +1,7 @@
 """One report answering: did this run work?
 
 Per-sample checks come from randcount.qc. The run-level check that needs the whole dataset is
-replicate agreement, which is what caught contamination in the published screen.
+replicate agreement, which catches contaminated samples.
 """
 import json
 import sys

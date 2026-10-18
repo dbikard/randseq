@@ -393,7 +393,7 @@ def get_patterns(contiguous=(5, 7), halves=(2, 4), max_spacer=8, min_defined=5, 
     """The search space: every motif architecture the scan looks for by default.
 
     A pattern is `(d1, spacer, d2)` -- defined bases, undefined gap, defined bases. The default
-    is the 43-pattern set used in the draft: contiguous sites of 5-7 bases, and gapped sites
+    is 43 patterns: contiguous sites of 5-7 bases, and gapped sites
     whose halves are 2-4 bases, with 5-8 defined bases in all and a gap of 1-8. It fits
     837 of the 983 distinct motifs in the REBASE Gold Standard set shipped with the package
     (`get_rebase_motifs`).
@@ -401,10 +401,8 @@ def get_patterns(contiguous=(5, 7), halves=(2, 4), max_spacer=8, min_defined=5, 
     The arguments widen it. `get_patterns(contiguous=(4, 8), halves=(2, 5), max_spacer=9)`
     (68 patterns) fits 902; adding `max_defined=9` (77) fits 911, at about 8 times the motifs
     tested (3.6 million against 460,000 on the larger example library). A wider search is not
-    free at the default thresholds: on the 21-strain panel the 68-pattern set adds 11 calls the
-    draft's Fig 3 does not have -- one-base-longer descriptions of weak or degenerate sites,
-    which steps 3 and 4 do not yet catch -- and loses one. It is kept as a test case for
-    improving those steps, not as the default.
+    free at the default thresholds: it adds one-base-longer descriptions of weak or degenerate
+    sites, which steps 3 and 4 do not yet catch, so it is not the default.
 
     Every pattern is returned in its `canonical_pattern` form, ordered by number of defined
     bases, then spacer.
@@ -558,7 +556,7 @@ def plasmid_background(sequences, log2fc, log2fc_thr=-1):
 
     Args:
         sequences (list): the inserts, without the vector flanks.
-        log2fc (array-like): log2 fold change per insert, in the same order (centred, as
+        log2fc (array-like): log2 fold change per insert, in the same order (median-normalised, as
             `find_restricted_motifs` uses it).
         log2fc_thr (float): a plasmid is depleted below this.
 

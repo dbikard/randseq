@@ -75,9 +75,9 @@ motifs
 </div>
 
 - `num_sequences`: the plasmids carrying the motif.
-- `fraction_depleted`: the share of them depleted, at log2FC below −0.5 after centring on the
+- `fraction_depleted`: the share of them depleted, at log2FC below −0.5 after normalising to the
   sample’s median.
-- `avg_log2fc`: the mean change of the carriers, relative to the sample’s typical plasmid.
+- `avg_log2fc`: the mean change of the carriers, relative to the sample’s median plasmid.
 - `q_value`: significance, adjusted for the false-discovery rate across the hundreds of thousands
   of motifs tested. A motif is called when q \< 0.05 and most of its carriers are confidently
   depleted.

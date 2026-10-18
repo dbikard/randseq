@@ -54,6 +54,9 @@ motifs_all = find_restricted_motifs(series, left, right, all_motifs=True)    # a
 ### Other
 
 - IUPAC-aware `revcomp` and `canonical_motif`; `normalise_motif` accepts bracketed classes.
+- `randseq.design`: `plan_library` (which motif architectures a library and vector can detect,
+  and the library size a site needs), `min_carriers`, and `carrier_fraction` (now exported and
+  width-aware for gapped patterns).
 - Optional compiled scan: `pip install "randseq[fast]"` (numba); results are identical.
 - `motif_presence_matrix` fills every column when two motifs share a code.
 - Removed: the unused attic module.

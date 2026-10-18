@@ -35,17 +35,19 @@ JJ1886 = dict(
     score_thr=0.7,
     # motif -> (fraction_depleted, num_sequences, avg_log2fc)
     expected={
-        "GGTCTC": (1.0, 9, -4.313837),
-        # This config restricts the pattern list and raises score_thr to 0.7. Under those
-        # settings the variant test in step 3 retains a different candidate set from the
-        # score-margin rule it replaced, so step 5 scores these two on fewer uniquely-carried
-        # plasmids -- same motifs, same perfect depletion, smaller denominator. On the default
-        # settings (get_patterns(), score_thr 0.5) both rules give identical support.
-        "CACNNNNGTAC": (1.0, 18, -5.057596),
-        "ATACNNNNGTG": (1.0, 138, -4.716200),
-        "AAAGNNNNGTT": (1.0, 61, -5.037651),
+        # Support is the number of plasmids that actually carry each motif, checked against a
+        # direct regex count on 2026-10-15; the earlier values (138/61/18) were undercounts.
+        # Rule 3 of step 3 is what removed the shadow CCACNNNAGTA, which used to be called here;
+        # holding step 4's leftovers to the scan's cutoff removed ACCTNNNCTTG (2026-10-17).
+        # avg_log2fc is measured from the sample's median since centring became the default.
+        # The Type I site was two rows, ATACNNNNGTG (1.0, 192, -4.805313) and CACNNNNGTAC
+        # (1.0, 20, -5.287198); since 2026-10-18 its called variants are reported as one IUPAC
+        # motif, carried by the 212 plasmids that carry either (CHANGELOG 26).
+        "GGTCTC": (1.0, 9, -4.363412),
+        "RTACNNNNGTG": (1.0, 212, -4.850774),
+        "AAAGNNNNGTT": (1.0, 63, -5.209253),
     },
-    expected_fixed={("GTG", "left", 0): 187, ("AAAG", "right", 4): 42},
+    merged={"RTACNNNNGTG": "ATACNNNNGTG+CACNNNNGTAC"},
 )
 
 PANEL = dict(
@@ -58,15 +60,17 @@ PANEL = dict(
     patterns=None,  # get_patterns()
     score_thr=0.5,
     expected={
-        # Support is now the number of plasmids that actually carry each motif -- checked
-        # against a direct regex count on 2026-10-13. The previous values (52/483/441/882) were
-        # undercounts left by the step-1 set-aside, which removed sequences before the scan.
-        "GGTCTC": (0.945455, 55, -2.804666),
-        "ATACNNNNGTG": (0.996032, 504, -3.218952),
-        "CACNNNNGTAC": (1.0, 468, -3.265288),
-        "AAAGNNNNGTT": (0.994524, 913, -3.378797),
+        # Support is the number of plasmids that actually carry each motif (direct regex count,
+        # 2026-10-13). Since 2026-10-15 the defaults centre each series on its median and use
+        # log2FC < -0.5: the same four motifs on the same plasmids, with depletion fractions and
+        # avg_log2fc now measured from the sample's median. The Type I site was two rows,
+        # ATACNNNNGTG (1.0, 504, -3.265818) and CACNNNNGTAC (1.0, 468, -3.312154); since
+        # 2026-10-18 it is one IUPAC motif on the 963 plasmids that carry either (CHANGELOG 26).
+        "GGTCTC": (0.981818, 55, -2.851532),
+        "RTACNNNNGTG": (1.0, 963, -3.285517),
+        "AAAGNNNNGTT": (0.997809, 913, -3.425663),
     },
-    expected_fixed={("CTTT", "left", 4): 242},
+    merged={"RTACNNNNGTG": "ATACNNNNGTG+CACNNNNGTAC"},
 )
 
 
@@ -87,11 +91,11 @@ def run_case(cfg):
 
 @pytest.mark.parametrize("cfg,name", [(JJ1886, "JJ1886"), (PANEL, "panel")])
 def test_reference_motifs(cfg, name):
-    fixed, flex = run_case(cfg)
+    flex = run_case(cfg)
 
     # Rows below the significance threshold are returned on purpose, flagged rather than
     # dropped, so the contract is about what is *called*.
-    called = flex[flex["called"]] if "called" in flex.columns else flex
+    called = flex[flex["called"]]
     assert set(called["motif"]) == set(cfg["expected"]), (
         f"{name}: called motif set changed.\n"
         f"  expected {sorted(cfg['expected'])}\n"
@@ -105,10 +109,8 @@ def test_reference_motifs(cfg, name):
         assert row["num_sequences"] == n, f"{name}/{row['motif']}: num_sequences"
         assert abs(row["fraction_depleted"] - frac) < TOL, f"{name}/{row['motif']}: fraction_depleted"
         assert abs(row["avg_log2fc"] - fc) < TOL, f"{name}/{row['motif']}: avg_log2fc"
-
-    got_fixed = {(r["motif"], r["anchor"], r["position"]): r["num_sequences"]
-                 for _, r in fixed.iterrows()}
-    assert got_fixed == cfg["expected_fixed"], f"{name}: fixed-position motifs changed"
+        assert row["merged_from"] == cfg["merged"].get(row["motif"], ""), \
+            f"{name}/{row['motif']}: merged_from"
 
 
 def test_both_datasets_agree_on_motifs():
@@ -141,7 +143,7 @@ def test_deterministic_across_hash_seeds():
         "from randseq.example_data import get_example_data_dir\n"
         "df = pd.read_csv(os.path.join(get_example_data_dir(), 'countsTable.csv.gz')).set_index('seq')\n"
         "l = calculate_log2fc(df[['MFDpir','JJ1886_T0']], reference_column='MFDpir')['JJ1886_T0']\n"
-        "_, flex = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
+        "flex = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
         "    flexible_motif_patterns=[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)],\n"
         "    flexible_motif_score_thr=0.7)\n"
         "rows = sorted((r['motif'], int(r['num_sequences']), round(float(r['avg_log2fc']), 6),\n"

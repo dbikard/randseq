@@ -18,7 +18,7 @@ from .utils import calculate_log2fc, get_motif_filter_with_context, get_custom_m
 # %% ../nbs/02_plotting.ipynb #8d97e736
 def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
                         left_context, right_context,
-                        title_main=None, # Changed default to None for auto-generation
+                        title_main=None,
                         pseudocount=1,
                         log2fc_count_threshold=20, log2fc_pseudocount=1,
                         figsize=(12, 6), save_filename=None, 
@@ -28,6 +28,8 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
     1. Scatter plot of normalized counts (sample vs reference).
     2. Histograms (density) of log2 Fold Change (sample_col / ref_col) for all sequences and each motif.
     If title_main is None, it's auto-generated from sample_col and ref_col.
+
+    Returns (fig, axes), or (None, None) when counts_df is empty or lacks either column.
     """
 
     if not isinstance(counts_df, pd.DataFrame) or counts_df.empty: return None, None
@@ -53,14 +55,9 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
         palette_name = "tab20" 
         if len(unique_plot_motifs) > 20:
             print(f"Warning: Number of unique motifs ({len(unique_plot_motifs)}) exceeds typical palette size. Colors may repeat.")
-    try:
-        motif_colors = sns.color_palette(palette_name, n_colors=len(unique_plot_motifs))
-        for i, motif_str in enumerate(unique_plot_motifs):
-            color_map[motif_str] = motif_colors[i]
-    except Exception as e: 
-        print(f"Warning: Could not generate specified color palette '{palette_name}'. Using defaults. Error: {e}")
-        for i, motif_str in enumerate(unique_plot_motifs): 
-             color_map[motif_str] = plt.cm.get_cmap("viridis")(i / max(1, len(unique_plot_motifs)-1) )
+    motif_colors = sns.color_palette(palette_name, n_colors=len(unique_plot_motifs))
+    for i, motif_str in enumerate(unique_plot_motifs):
+        color_map[motif_str] = motif_colors[i]
     hue_order = ['All Sequences'] + unique_plot_motifs
 
     # --- Data for Scatter Plot ---
@@ -128,22 +125,17 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
     # --- Subplot 2: Distribution Plot (Histogram of Log2FC) ---
     if hist_data_list:
         hist_df = pd.DataFrame(hist_data_list)
-        try:
-            sns.histplot(data=hist_df, x='value', hue='group', hue_order=hue_order,
-                         palette=color_map, 
-                         ax=ax_dist, 
-                         stat="density", 
-                         common_norm=False, 
-                         log_scale=(distribution_plot_log_xscale), 
-                         multiple="layer", element="bars", kde=False, bins="auto")
-            ax_dist.set_xlabel(f"log2 Fold Change ({sample_col} / {ref_col})")
-            ax_dist.set_ylabel("Density") 
-            ax_dist.set_title("Distribution of log2 Fold Change by Motif", fontsize=12)
-            ax_dist.grid(True, axis='y', ls='--', alpha=0.5)
-        except Exception as e:
-            print(f"Error during Histogram plot creation: {e}")
-            ax_dist.text(0.5, 0.5, "Error creating Histogram.", horizontalalignment='center', 
-                         verticalalignment='center', transform=ax_dist.transAxes, color='red')
+        sns.histplot(data=hist_df, x='value', hue='group', hue_order=hue_order,
+                     palette=color_map, 
+                     ax=ax_dist, 
+                     stat="density", 
+                     common_norm=False, 
+                     log_scale=(distribution_plot_log_xscale), 
+                     multiple="layer", element="bars", kde=False, bins="auto")
+        ax_dist.set_xlabel(f"log2 Fold Change ({sample_col} / {ref_col})")
+        ax_dist.set_ylabel("Density") 
+        ax_dist.set_title("Distribution of log2 Fold Change by Motif", fontsize=12)
+        ax_dist.grid(True, axis='y', ls='--', alpha=0.5)
     else:
         ax_dist.text(0.5, 0.5, "No Log2FC data for distribution.",
                      horizontalalignment='center', verticalalignment='center',
@@ -153,8 +145,7 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
     fig.tight_layout(pad=2.0)
 
     if save_filename:
-        try: fig.savefig(save_filename, bbox_inches='tight', dpi=300)
-        except: pass 
+        fig.savefig(save_filename, bbox_inches='tight', dpi=300)
     return fig, axes
 
 # %% ../nbs/02_plotting.ipynb #ce39ffcd

@@ -52,7 +52,7 @@ def get_sites_in_seq(
 
     Args:
         sequence_library: A list of DNA sequence strings. They do NOT have to be the same
-                          length -- real libraries are ragged (in the published screen only
+                          length -- real libraries are ragged (in the BB2 screen only
                           ~91% of inserts were exactly the nominal 150 nt). The pattern is
                           only required to fit inside the shortest one.
         pattern: A tuple of three non-negative integers:

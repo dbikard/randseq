@@ -1,9 +1,9 @@
 lab_id,strain,demonstrates
-12049,JJ1886,"three active RM systems, strong clean signal - the worked example"
-11996,CFT073,weak but reproducible depletion that single-plasmid assays missed
-8408,HS,"BREX: mean log2FC about -0.77, invisible at the default -1 threshold"
-15846,LMR_503,four co-occurring motifs spanning -1.31 to -3.26 in one strain
-16171,B156,fixed-position motif GTC@4 IS AAACNNNNGTC formed with the left flank
-16223,381A,"noisy: hundreds of candidates, which step 4 cuts to the real CCTNAGG and one weak call"
+12049,JJ1886,"three active RM systems, strong clean signal - the worked example; the Type I site RTACNNNNGTG is reported as one motif, merged from its two called variants ATACNNNNGTG and CACNNNNGTAC (GTACNNNNGTG on the other strand)"
+11996,CFT073,"one weak but clear system, GAGNNNNNNNGTCA (mean log2FC about -1.0), that single-plasmid assays missed"
+8408,HS,"BREX: GGTAAG at mean log2FC about -0.65, called at the default -0.5 (centred) and missed at -1"
+15846,LMR_503,"four co-occurring sites in one strain, mean log2FC -1.55 to -3.19"
+16171,B156,"two degenerate sites, each called as two variants and reported as one motif: GACNNNNGTTY (AAACNNNNGTC+GAACNNNNGTC) and CCAYNNNNNTGT (ACANNNNNATGG+ACANNNNNGTGG); AAACNNNNGTC takes AAAC partly from the left flank"
+16223,381A,"noisy: 157 candidates, 91 after step 3; only the real CCTNAGG is called"
 12766,EDL933,"wild type, paired with its isogenic RM knockout below"
 12767,EDL933_dRM,isogenic RM knockout - the pipeline must call nothing here

@@ -89,7 +89,7 @@ def encode_motif(motif, pattern):
     """Integer code of `motif` under `pattern`, inverse of `decode_motif_codes`.
 
     Returns None if the motif does not fit the pattern or contains a base outside ACGT --
-    IUPAC-degenerate motifs have no single code and fall back to the regex path.
+    an IUPAC-degenerate motif has no single code (`core` reads it through its instances).
     """
     d1, spacer, d2 = pattern
     if len(motif) != d1 + spacer + d2:
@@ -148,9 +148,9 @@ def rc_code_table(pattern):
     x = (x >> 16) | (x << 16)                                # swap the two halves
     table = ((x >> np.uint32(32 - 2 * k)) ^ np.uint32(4 ** k - 1)).astype(np.int64)
     # A lookup into this, rather than evaluating the formula on every window, because in numpy
-    # each line above is a full pass over the array: on a 30k x 300 window-code matrix the
-    # formula costs 60 ms per pattern and the lookup 21 ms. The table is 4**k entries, the same
-    # size as the bincount the scan already allocates for this pattern.
+    # each line above is a full pass over the array: on the panel library's 30k x 360
+    # window-code matrix the formula costs about twice the lookup (85 ms vs 45 ms per pattern).
+    # The table is 4**k entries, the same size as the bincount the scan already allocates.
     table.setflags(write=False)           # cached and shared; never mutate in place
     return table
 
@@ -160,8 +160,8 @@ def motif_presence_matrix(encoded_library, motifs, patterns):
 
     One pass per distinct pattern rather than one per motif, and a lookup into the window codes
     rather than a regex per sequence. Motifs whose pattern is unknown, or which contain IUPAC
-    ambiguity codes, are left as all-False here; the caller falls back to the regex path for
-    those, so behaviour is unchanged and only the common case gets faster.
+    ambiguity codes, are left as all-False here and not handled; `core` reads a degenerate motif
+    through its instances (`motif_instances`) and an unknown pattern by regex.
 
     Returns `(matrix, handled)` where `handled` marks the motifs the matrix actually covers.
     """
@@ -180,16 +180,23 @@ def motif_presence_matrix(encoded_library, motifs, patterns):
 
     for pattern, entries in by_pattern.items():
         n_codes = 4 ** (pattern[0] + pattern[2])
-        # code -> column in `matrix`, or -1 for codes we do not care about
-        lookup = np.full(n_codes + 1, -1, dtype=np.int32)
+        # Two motifs can share a code -- a site and its reverse complement, or the same site
+        # listed twice -- so each distinct code gets a group, and every column of the group is
+        # filled from it.
+        groups = defaultdict(list)
         for j, code in entries:
-            lookup[code] = j
+            groups[code].append(j)
+        lookup = np.full(n_codes + 1, -1, dtype=np.int32)      # -1: codes we do not care about
+        for g, code in enumerate(groups):
+            lookup[code] = g
         codes = np.concatenate(
             [_pattern_window_codes(fwd, pattern), _pattern_window_codes(rc, pattern)], axis=1)
-        cols = lookup[codes]
-        rows, where = np.nonzero(cols >= 0)
-        if len(rows):
-            matrix[rows, cols[rows, where]] = True
+        hit = lookup[codes]
+        rows, where = np.nonzero(hit >= 0)
+        present = np.zeros((n_seq, len(groups)), dtype=bool)
+        present[rows, hit[rows, where]] = True
+        for g, cols in enumerate(groups.values()):
+            matrix[:, cols] = present[:, [g]]
         for j, _ in entries:
             handled[j] = True
 

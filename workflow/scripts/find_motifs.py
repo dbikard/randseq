@@ -70,7 +70,7 @@ for recipient in recipients:
     series = table[recipient].dropna()
     print(f"\n### {recipient}: {len(series)} plasmids", flush=True, file=sys.stderr)
     try:
-        _fixed, flex = find_restricted_motifs(
+        flex = find_restricted_motifs(
             series, left, right,
             flexible_motif_patterns=get_patterns(),
             flexible_motif_log2fc_thr=l2fc_thr,

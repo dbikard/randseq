@@ -31,7 +31,7 @@ def _motif_site_count(sequence, motif, circular=False):
         n += len(re.findall(f"(?={_custom_motif_to_regex(rc_motif)})", seq))
     return n
 
-
+# %% ../nbs/03_design.ipynb #e2143428
 def backbone_motif_counts(backbone, patterns, circular=False):
     """Every motif of `patterns` that the backbone already carries, and how many copies.
 
@@ -65,7 +65,7 @@ def backbone_motif_counts(backbone, patterns, circular=False):
                              copies=int(c) // 2 if revcomp(motif) == motif else int(c)))
     return pd.DataFrame(rows, columns=["motif", "pattern", "copies"])
 
-
+# %% ../nbs/03_design.ipynb #ad898214
 def backbone_masking_summary(backbone, patterns, circular=False):
     """Per pattern, how much of the searchable motif space the backbone already occupies.
 
@@ -83,7 +83,7 @@ def backbone_masking_summary(backbone, patterns, circular=False):
                          motifs=space, carried=n, fraction=n / space))
     return pd.DataFrame(rows)
 
-
+# %% ../nbs/03_design.ipynb #16339355
 def annotate_backbone(results_df, backbone, circular=False):
     """Add `backbone_copies` to a result table: copies of each reported motif in the backbone.
 

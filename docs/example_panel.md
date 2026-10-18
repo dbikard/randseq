@@ -1,49 +1,50 @@
 # The example panel
 
 `randseq/example_data/counts_panel.csv.gz` holds eight BB2 strains and both donor replicates,
-as raw UMI counts. Each strain is there because it justifies a design decision, and this page
-records what each one actually does so the walkthrough's claims can be checked.
+as raw UMI counts. Each strain is there because it exercises one behaviour of the pipeline, and
+this page records what each one does so the walkthrough's claims can be checked.
 
-Verified 2026-09-29 with the settings the pipeline defaults to: log2FC computed per replicate
-against that replicate's own donor at `count_threshold=10`, averaged, then
-`find_restricted_motifs` at `score_thr=0.5`. 33,608 plasmids survive filtering.
+Measured 2026-10-17 (merged motifs 2026-10-18) at the pipeline's defaults: log2FC of replicate R1 against `Control_R1`
+(`calculate_log2fc`, `count_threshold=20`, 30,108 plasmids kept), then
+`find_restricted_motifs(series, left, right)` — `get_patterns()`, centred, depleted below −0.5,
+score 0.5. "Called" means q < 0.05.
 
-| strain | threshold | motifs called |
+| strain | motifs called | candidates entering step 4 |
 |---|---|---|
-| JJ1886 | −1.0 | `GGTCTC`, `ATACNNNNGTG`, `CACNNNNGTAC`, `AAAGNNNNGTT` |
-| CFT073 | −1.0 | `GAGNNNNNNNGTCA` |
-| HS | −1.0 | **none** |
-| HS | −0.5 | `GGTAAG` |
-| LMR_503 | −1.0 | `GGTCTC`, `ATACNNNNGTG`, `CACNNNNGTAC`, `AAAGNNNNGTT`, `ACGNNNNNGTTG` |
-| B156 | −1.0 | `GAACNNNNGTC`, `AAACNNNNGTC`, `ACANNNNNATGG`, `ACANNNNNGTGG` |
-| 381A | −1.0 | `TooManyCandidatesError` (455 candidates) |
-| EDL933 | −1.0 | `CACNNNNNNNCTGG` |
-| EDL933_dRM | −1.0 | **none** |
+| JJ1886 | `GGTCTC`, `RTACNNNNGTG`, `AAAGNNNNGTT` | 4 |
+| CFT073 | `GAGNNNNNNNGTCA` | 1 |
+| HS | `GGTAAG` | 3 |
+| LMR_503 | `GGTCTC`, `RTACNNNNGTG`, `AAAGNNNNGTT`, `ACGNNNNNGTTG` | 8 |
+| B156 | `GACNNNNGTTY`, `CCAYNNNNNTGT` | 4 |
+| 381A | `CCTNAGG` | 91 |
+| EDL933 | `CACNNNNNNNCTGG` | 1 |
+| EDL933_dRM | **none** | 0 |
 
 ## What each one is for
 
 **JJ1886** — the worked example. Three active RM systems, strong clean signal, and the motifs
-are independently known, so it is the right place to introduce the pipeline.
+are independently known. The Type I site `RTACNNNNGTG` is called as two variants and reported as one motif.
 
-**CFT073** — weak but real. A single motif that single-plasmid conjugation assays missed. It
-shows why a sensitive method needs a defensible threshold rather than an obvious one.
+**CFT073** — weak but real. A single motif that single-plasmid conjugation assays missed.
 
-**HS** — thresholds are not universal. BREX interference is weaker than restriction-modification,
-so at the default −1.0 nothing is called; at −0.5 the cognate `GGTAAG` appears. Anyone applying
-the defaults to a BREX strain and concluding "no activity" would be wrong.
+**HS** — thresholds are not universal. BREX interference is weaker than restriction-modification:
+`GGTAAG` is called at the default −0.5 and missed at −1. Anyone applying a −1 threshold to a BREX
+strain and concluding "no activity" would be wrong.
 
-**LMR_503** — co-occurring motifs of very different strength in one strain. This is the case the
-redundancy filter and the unique-hit rescoring exist for: without them the strong motifs' signal
-bleeds into the weak ones.
+**LMR_503** — co-occurring motifs of very different strength in one strain. This is the case
+steps 3 and 4 exist for: without them the strong motifs' signal bleeds into many shadow
+descriptions.
 
-**B156** — why the fixed-position step exists. Its fixed-position hit is `GTC` at offset 4, which
-is not a separate site: the left flank ends in `AAAC`, so `GTC@4` *is* `AAACNNNNGTC` formed
-across the junction between vector and insert. The motif only looks position-specific because
-the flank pins it there.
+**B156** — a site formed across the vector junction, and two degenerate sites. The left flank
+ends in `AAAC`, so every insert starting `NNNNGTC` completes `AAACNNNNGTC`: 382 of its 894
+carriers carry it that way. The scan reads the flanks with the insert, so the site is found like
+any other. Both sites are called as two variants each and reported as `GACNNNNGTTY` (=
+`RAACNNNNGTC`) and `CCAYNNNNNTGT`.
 
-**381A** — what pathology looks like. It produces far more candidates than the unique-hit step
-will score, and raises rather than returning them. In the published Fig 3 table this strain
-silently contributed 344 of 374 rows as unfiltered candidates.
+**381A** — a noisy sample: the largest step-4 input of the panel, and a third of its library
+depleted for reasons unrelated to any site. Only the real `CCTNAGG` is called; two weak motifs
+(about half their carriers depleted) are tested against their carriers' GC-matched background and
+stay uncalled.
 
 **EDL933 and EDL933_dRM** — specificity, demonstrated isogenically. The wild type yields
 `CACNNNNNNNCTGG`; its RM knockout yields nothing. A negative result from an unrelated strain
@@ -52,5 +53,5 @@ proves much less than a matched pair.
 ## Regenerating
 
 `work/build_example_data.py` builds the panel from
-`randseq_paper/data/RandSeq_BB2_UMIcounts_EM_n10_R{1,2}.csv`;
-`work/verify_panel_claims.py` reproduces the table above.
+`randseq_paper/data/RandSeq_BB2_UMIcounts_EM_n10_R{1,2}.csv`; `work/after_nofixed.py` reproduces
+the table above (with the 20 nt library and the BB2 panel).

@@ -33,8 +33,9 @@ if HAVE_NUMBA:
         return r
 
     @njit(inline="always", cache=True)
-    def _scan_rows(fwd, rc, lo, hi, d1, sp, d2, fc, thr, fold, n, ndep, fsum, first, stamp):
-        """Accumulate the totals of sequences lo..hi-1 into n, ndep, fsum and first."""
+    def _scan_rows(fwd, rc, lo, hi, d1, sp, d2, fc, bg, thr, fold, n, ndep, fsum, bsum, first,
+                   stamp):
+        """Accumulate the totals of sequences lo..hi-1 into n, ndep, fsum, bsum and first."""
         k = d1 + d2
         w = d1 + sp + d2
         L = fwd.shape[1]
@@ -76,20 +77,23 @@ if HAVE_NUMBA:
                         n[code] += 1
                         ndep[code] += dep
                         fsum[code] += fc[i]
+                        bsum[code] += bg[i]
 
     @njit(cache=True)
-    def _scan_serial(fwd, rc, d1, sp, d2, fc, thr, fold):
+    def _scan_serial(fwd, rc, d1, sp, d2, fc, bg, thr, fold):
         nc = 4 ** (d1 + d2)
         n = np.zeros(nc, np.int64)
         ndep = np.zeros(nc, np.int64)
         fsum = np.zeros(nc, np.float64)
+        bsum = np.zeros(nc, np.float64)
         first = np.full(nc, fwd.shape[0], np.int64)
         stamp = np.full(nc, -1, np.int64)
-        _scan_rows(fwd, rc, 0, fwd.shape[0], d1, sp, d2, fc, thr, fold, n, ndep, fsum, first, stamp)
-        return n, ndep, fsum, first
+        _scan_rows(fwd, rc, 0, fwd.shape[0], d1, sp, d2, fc, bg, thr, fold, n, ndep, fsum, bsum,
+                   first, stamp)
+        return n, ndep, fsum, bsum, first
 
     @njit(parallel=True, cache=True)
-    def _scan_parallel(fwd, rc, d1, sp, d2, fc, thr, fold, nchunks):
+    def _scan_parallel(fwd, rc, d1, sp, d2, fc, bg, thr, fold, nchunks):
         # Each chunk of sequences gets its own counters, so threads never write to the same
         # array; the chunks are summed afterwards. A stamp is per chunk too, which is correct
         # because a sequence lives in exactly one chunk.
@@ -98,25 +102,27 @@ if HAVE_NUMBA:
         N = np.zeros((nchunks, nc), np.int64)
         D = np.zeros((nchunks, nc), np.int64)
         F = np.zeros((nchunks, nc), np.float64)
+        B = np.zeros((nchunks, nc), np.float64)
         M = np.full((nchunks, nc), nseq, np.int64)
         for c in prange(nchunks):
             stamp = np.full(nc, -1, np.int64)
             lo = c * nseq // nchunks
             hi = (c + 1) * nseq // nchunks
-            _scan_rows(fwd, rc, lo, hi, d1, sp, d2, fc, thr, fold, N[c], D[c], F[c], M[c], stamp)
+            _scan_rows(fwd, rc, lo, hi, d1, sp, d2, fc, bg, thr, fold, N[c], D[c], F[c], B[c], M[c],
+                       stamp)
         first = np.full(nc, nseq, np.int64)
         for c in range(nchunks):
             for x in range(nc):
                 if M[c, x] < first[x]:
                     first[x] = M[c, x]
-        return N.sum(axis=0), D.sum(axis=0), F.sum(axis=0), first
+        return N.sum(axis=0), D.sum(axis=0), F.sum(axis=0), B.sum(axis=0), first
 
 # %% ../nbs/05_fast.ipynb #5529d80d
-def pattern_totals(encoded_library, pattern, fc_values, log2FC_thr=-1, parallel=True):
+def pattern_totals(encoded_library, pattern, fc_values, background, log2FC_thr=-1, parallel=True):
     """Per motif code: how many sequences carry it, how many of those are depleted, the sum of
-    their log2FC, and the first sequence that carries it.
+    their log2FC, the sum of their background, and the first sequence that carries it.
 
-    The same four arrays as `_motif_totals(*motif_occurrences(...), ...)`, with the same types,
+    The same five arrays as `_motif_totals(*motif_occurrences(...), ...)`, with the same types,
     computed in one compiled pass. `parallel` spreads the sequences over numba's threads; pass
     False inside a worker process that is itself one of several, so the machine is not asked
     for workers x threads at once.
@@ -133,14 +139,17 @@ def pattern_totals(encoded_library, pattern, fc_values, log2FC_thr=-1, parallel=
             f"{4 ** (d1 + d2):.3g} counting bins.")
     fwd, rc = (np.ascontiguousarray(a, dtype=np.uint8) for a in encoded_library)
     fc = np.ascontiguousarray(fc_values, dtype=np.float64)
+    bg = np.ascontiguousarray(background, dtype=np.float64)
     fold = pattern_is_self_rc(pattern)
     threads = numba.get_num_threads()
-    # Every chunk holds four counter arrays of 4**(d1+d2) entries, so the chunk count is capped
-    # by memory as well as by threads: at nine defined bases 32 chunks would be ~270 MB.
+    # Every chunk holds five counter arrays of 4**(d1+d2) entries, so the chunk count is capped
+    # by memory as well as by threads: all chunks together get 2**23 entries per array (~335 MB
+    # for the five), reached at nine defined bases by 32 chunks, unless that is fewer than threads.
     nchunks = min(fwd.shape[0], 4 * threads, max(threads, (1 << 23) // 4 ** (d1 + d2)))
     if parallel and threads > 1 and nchunks > 1:
-        n, ndep, fsum, first = _scan_parallel(fwd, rc, d1, sp, d2, fc, float(log2FC_thr), fold,
-                                              nchunks)
+        n, ndep, fsum, bsum, first = _scan_parallel(fwd, rc, d1, sp, d2, fc, bg, float(log2FC_thr),
+                                                    fold, nchunks)
     else:
-        n, ndep, fsum, first = _scan_serial(fwd, rc, d1, sp, d2, fc, float(log2FC_thr), fold)
-    return n, ndep.astype(np.float64), fsum, first
+        n, ndep, fsum, bsum, first = _scan_serial(fwd, rc, d1, sp, d2, fc, bg, float(log2FC_thr),
+                                                  fold)
+    return n, ndep.astype(np.float64), fsum, bsum, first

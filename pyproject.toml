@@ -7,12 +7,12 @@ name = "randseq"
 dynamic = ["version"]
 description = "inferring restricted motifs using the  RandSeq method"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{name = "dbikard", email = "dbikard@gmail.com"}]
 keywords = ['nbdev', 'jupyter', 'notebook', 'python']
 classifiers = ["Natural Language :: English", "Intended Audience :: Developers", "Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only"]
-dependencies = ['fastcore', 'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'tqdm', 'pyahocorasick', 'plotnine']
+dependencies = ['fastcore', 'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'tqdm', 'plotnine']
 
 [project.optional-dependencies]
 # A compiled kernel for the pattern scan (randseq.fast), ~13x faster on 8 cores. Results are

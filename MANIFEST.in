@@ -1,5 +1,4 @@
 include LICENSE
-include CONTRIBUTING.md
 include README.md
 recursive-include randseq/example_data *.csv.gz *.csv *.fasta
 recursive-include randseq/data *.txt

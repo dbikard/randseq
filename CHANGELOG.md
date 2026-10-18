@@ -82,6 +82,9 @@ motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
 
 ### Other
 
+- `find_restricted_motifs` prints a short log by default: counts per step, the degenerate
+  merges, the number called. `verbose=True` also lists each candidate step 4 removes and each
+  motif scored.
 - IUPAC-aware `revcomp` and `canonical_motif`; `normalise_motif` accepts bracketed classes.
 - `randseq.design`: `plan_library` (which motif architectures a library and vector can detect,
   and the library size a site needs), `min_carriers`, and `carrier_fraction` (now exported and

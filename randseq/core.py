@@ -805,6 +805,7 @@ def find_restricted_motifs(
     q_threshold:float=0.05, # a motif is called when its q-value is below this
     encoded_library:tuple|None=None, # the library from `encode_library`, if already encoded
     all_motifs:bool=False, # return every scored motif with every column, not only the calls
+    verbose:bool=False, # also print each candidate step 4 removes and each motif scored
 )->pd.DataFrame: # the called motifs, one row each (*Reading the result table*)
     "The motifs one sample restricts: steps 2 to 4 and reporting, on a log2FC series."
     candidates = pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences',
@@ -891,16 +892,19 @@ def find_restricted_motifs(
         min_support=min_support, encoded=encoded_library,
         p_threshold=scan_cutoff, background=background)
     if explained:
-        print(f"{len(explained)} candidate(s) whose score was borrowed:")
-        for m, (by, n, s) in sorted(explained.items()):
-            print(f"    {m} <- {by} (without them: n={n}, score={s:.2f})")
+        print(f"{len(explained)} candidate(s) whose score was borrowed from a stronger one.")
+        if verbose:
+            for m, (by, n, s) in sorted(explained.items()):
+                print(f"    {m} <- {by} (without them: n={n}, score={s:.2f})")
 
     # Canonicalise before printing, so the names in the log are the names in the table.
     candidates = _canonicalise_motifs(candidates)
-    print(f"{len(candidates)} motif(s) scored:")
-    for _, row in candidates.iterrows():
-        print(f"  {row['motif']} (pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, "
-              f"AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
+    print(f"{len(candidates)} motif(s) scored.")
+    if verbose:
+        for _, row in candidates.iterrows():
+            print(f"  {row['motif']} (pattern {row['pattern']}), "
+                  f"FracDep: {row['fraction_depleted']:.2f}, "
+                  f"AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
     table = report(candidates, log2fc_series, left_context_str, right_context_str,
                    all_pvalues=tested_pvalues, encoded=encoded_library, background=background)
 

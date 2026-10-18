@@ -19,19 +19,10 @@ for _i, _b in enumerate("ACGT"):
     _BASE_CODES[ord(_b)] = _BASE_CODES[ord(_b.lower())] = _i
 _CODE_BASES = np.frombuffer(b"ACGT", dtype=np.uint8)
 
-def encode_library(sequences):
-    """
-    Encodes DNA sequences as 2-bit base codes, the form the scan reads (and `find_restricted_motifs` takes as `encoded_library`).
-
-    Args:
-        sequences (list): DNA strings (typically library sequences with context);
-            they may have different lengths.
-
-    Returns:
-        tuple: (fwd, rc) uint8 arrays of shape (n_sequences, max_length) holding the
-            base codes of each sequence and of its reverse complement. A=0, C=1, G=2,
-            T=3; non-ACGT characters and the padding of shorter sequences are 4.
-    """
+def encode_library(
+    sequences:list, # DNA strings, e.g. inserts with their flanks; lengths may differ
+)->tuple: # `(fwd, rc)`: uint8 base codes (n_sequences, max_length) of each sequence and its rc
+    "Encode DNA sequences as base codes, the form the scan reads (`encoded_library`)."
     max_len = max(len(s) for s in sequences)
     fwd = np.full((len(sequences), max_len), 4, dtype=np.uint8)
     rc = np.full_like(fwd, 4)

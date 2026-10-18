@@ -17,43 +17,41 @@ from .coding import encode_library, _pattern_window_codes, _decode_motif_codes
 from .utils import revcomp, get_patterns, _custom_motif_to_regex
 
 # %% ../nbs/03_design.ipynb #16319ae6
-def carrier_fraction(k, L, width=None, palindrome=False):
-    """Chance that a random sequence of length `L` carries a given motif of `k` defined bases
-    spread over `width` positions (default `k`, a contiguous site), on either strand.
-
-    `L` may be a list of lengths, for a library whose inserts vary; the result is the mean over
-    them. A palindrome reads the same on both strands, so it has one strand's chances.
-    """
+def carrier_fraction(
+    k:int, # defined bases of the motif
+    L:int|list, # sequence length, or a list of lengths to average over
+    width:int|None=None, # positions the motif spans; default `k`, a contiguous site
+    palindrome:bool=False, # the motif reads the same on both strands, so has one strand's chances
+)->float: # the chance, or its mean over the lengths
+    "Chance that a random sequence of length `L` carries a given motif, on either strand."
     windows = np.maximum(np.asarray(L) - (width or k) + 1, 0)
     return float(np.mean(1 - (1 - 4.0 ** -k) ** ((1 if palindrome else 2) * windows)))
 
 # %% ../nbs/03_design.ipynb #58c1bec2
-def min_carriers(fraction_depleted, background, cutoff=1e-4, score_thr=0.5, min_support=5):
-    """Fewest carriers at which a motif with this depleted fraction is called; None if no number
-    up to 20,000 is enough.
-
-    The two calling conditions of `find_restricted_motifs`, with the Benjamini-Hochberg correction
-    replaced by the p-value `cutoff` it leaves in a sample: the depleted count has a binomial
-    p-value at most `cutoff` against `background`, and the one-sided 95% lower bound on the
-    depleted fraction reaches `score_thr`.
-    """
+def min_carriers(
+    fraction_depleted:float, # share of the motif's carriers depleted
+    background:float, # the rate at which its carriers would deplete with no site involved
+    cutoff:float=1e-4, # the p-value cutoff the Benjamini-Hochberg correction leaves in a sample
+    score_thr:float=0.5, # the one-sided 95% lower bound on the depleted fraction must reach this
+    min_support:int=5, # fewest carriers a motif is scored with
+)->int|None: # fewest carriers at which the motif is called; None if 20,000 are not enough
+    "Fewest carriers at which a motif with this depleted fraction is called."
     n = np.arange(min_support, 20001)
     k = np.ceil(fraction_depleted * n)
     ok = (binom.sf(k - 1, n, background) <= cutoff) & (beta.ppf(0.05, k, n - k + 1) >= score_thr)
     return int(n[ok][0]) if ok.any() else None
 
 # %% ../nbs/03_design.ipynb #ed21cfcb
-def plan_library(N, L, patterns=None, background=0.1, cutoff=1e-4, weak=0.6, backbone=None):
-    """What a library of `N` inserts can call, per motif architecture.
-
-    `L` is the insert length, or the lengths themselves when they vary. For each pattern of
-    `patterns` (default `get_patterns()`): `carriers`, the expected carriers of a motif with its
-    site inside the insert, and `non_carriers`; then, for a site depleting every carrier
-    (`strong`) and one depleting a fraction `weak` of them, the carriers needed to call it
-    (`min_carriers` at `background` and `cutoff`), whether the library has them, and the library
-    size that would (`N_strong`, `N_weak`). With a `backbone` sequence, `masked` is the share of
-    the pattern's motifs the vector already carries (`backbone_masking_summary`).
-    """
+def plan_library(
+    N:int, # number of inserts
+    L:int|list, # insert length, or the lengths themselves when they vary
+    patterns:list|None=None, # architectures to assess; default `get_patterns()`
+    background:float=0.1, # depletion rate of plasmids without the site, as for `min_carriers`
+    cutoff:float=1e-4, # p-value cutoff, as for `min_carriers`
+    weak:float=0.6, # depleted fraction of the weak site
+    backbone:str|None=None, # the vector sequence, to add `masked`
+)->pd.DataFrame: # one row per pattern, with the columns described above
+    "What a library of `N` inserts can call, per motif architecture."
     patterns = get_patterns() if patterns is None else patterns
     rows = []
     for p in patterns:
@@ -92,15 +90,12 @@ def _motif_site_count(sequence, motif, circular=False):
     return n
 
 # %% ../nbs/03_design.ipynb #e2143428
-def backbone_motif_counts(backbone, patterns, circular=False):
-    """Every motif of `patterns` that the backbone already carries, and how many copies.
-
-    `circular=False` is right for a library backbone, which is a linear stretch running from one
-    side of the insert round to the other -- the insert closes it, so it is not circular on its
-    own. Pass `circular=True` for a whole plasmid.
-
-    Returns 'motif', 'pattern' and 'copies', one row per motif carried at least once.
-    """
+def backbone_motif_counts(
+    backbone:str, # the vector sequence
+    patterns:list, # `(d1, spacer, d2)` architectures
+    circular:bool=False, # also count sites across the ends: True for a whole plasmid
+)->pd.DataFrame: # 'motif', 'pattern', 'copies': a row per motif carried, under both spellings
+    "Every motif of `patterns` that the backbone already carries, and how many copies."
     rows = []
     for pattern in patterns:
         d1, spacer, d2 = pattern
@@ -126,13 +121,12 @@ def backbone_motif_counts(backbone, patterns, circular=False):
     return pd.DataFrame(rows, columns=["motif", "pattern", "copies"])
 
 # %% ../nbs/03_design.ipynb #ad898214
-def backbone_masking_summary(backbone, patterns, circular=False):
-    """Per pattern, how much of the searchable motif space the backbone already occupies.
-
-    A motif the backbone carries is one the assay is unlikely to report for this vector, so this
-    is the coverage of the search space -- the share of possible answers ruled out before any
-    data is collected.
-    """
+def backbone_masking_summary(
+    backbone:str, # the vector sequence
+    patterns:list, # `(d1, spacer, d2)` architectures
+    circular:bool=False, # as for `backbone_motif_counts`
+)->pd.DataFrame: # per pattern: 'defined_bases', 'motifs' (4**k), 'carried', and their 'fraction'
+    "Per pattern, the share of possible motifs the backbone already carries."
     counts = backbone_motif_counts(backbone, patterns, circular=circular)
     carried = counts.groupby("pattern").size() if len(counts) else pd.Series(dtype=int)
     rows = []
@@ -144,14 +138,12 @@ def backbone_masking_summary(backbone, patterns, circular=False):
     return pd.DataFrame(rows)
 
 # %% ../nbs/03_design.ipynb #16339355
-def annotate_backbone(results_df, backbone, circular=False):
-    """Add `backbone_copies` to a result table: copies of each reported motif in the backbone.
-
-    0 is the expected value for anything the pipeline reported, since a motif the backbone
-    carries is usually not detectable in the first place. A non-zero count is worth looking at:
-    it means the motif was called *despite* the vector already carrying it, which happens when
-    interference is density-dependent.
-    """
+def annotate_backbone(
+    results_df:pd.DataFrame, # a table with a 'motif' column, e.g. a result table
+    backbone:str, # the vector sequence
+    circular:bool=False, # as for `backbone_motif_counts`
+)->pd.DataFrame: # a copy with `backbone_copies`; returned as given when there is nothing to add
+    "Add `backbone_copies` to a table of motifs: the copies of each motif in the backbone."
     if results_df is None or len(results_df) == 0 or "motif" not in results_df.columns:
         return results_df
     out = results_df.copy()

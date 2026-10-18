@@ -50,28 +50,14 @@ _COMPLEMENT = str.maketrans("".join(_IUPAC_COMPLEMENT), "".join(_IUPAC_COMPLEMEN
 
 
 # %% ../nbs/01_utils.ipynb #74913579
-def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudocount=1,
-                     normalize="median"):
-    """
-    Filters a DataFrame, normalizes columns by sum, calculates log2 fold change
-    relative to a reference column, drops the reference column and, by default, subtracts each
-    sample's median log2FC.
-
-    Args:
-        df (pd.DataFrame): Input DataFrame (rows=features, columns=samples). NaN counts as 0.
-        reference_column (str): Name of the reference sample column.
-        count_threshold (int): a feature is kept when its reference count is strictly above this.
-        pseudocount (float): Value added to the raw counts, before normalisation.
-        normalize (str): "median" (default) subtracts each sample column's median, so the median
-            plasmid has log2FC 0 (fold change 1): median-ratio normalisation, as in DESeq2. On the
-            log2 scale this is the same as rescaling the counts by the median ratio. "total"
-            stops at each column normalised to its total, so a sample's log2FC are shares
-            relative to the reference's.
-
-    Returns:
-        pd.DataFrame: DataFrame with log2 fold change values. None if reference
-                      column is missing. Empty DataFrame if all rows are filtered out.
-    """
+def calculate_log2fc(
+    df:pd.DataFrame, # read counts, one row per insert, one column per sample; NaN counts as 0
+    reference_column:str='MFDpir', # the input-library column every sample is compared with
+    count_threshold:int=20, # an insert is kept when its reference count is strictly above this
+    pseudocount:float=1, # added to the raw counts, before normalisation
+    normalize:str="median", # "median": each sample's median insert at 0; "total": shares only
+)->pd.DataFrame: # one column per sample, reference dropped; None without it, empty if none pass
+    "log2 fold change of each insert against the reference column, median-normalised by default."
     if normalize not in ("median", "total"):
         raise ValueError(f"normalize must be 'median' or 'total', not {normalize!r}")
 
@@ -116,12 +102,10 @@ def calculate_log2fc(df, reference_column='MFDpir', count_threshold=20, pseudoco
     return log2fc_df
 
 # %% ../nbs/01_utils.ipynb #44e4aa1e
-def normalise_motif(motif:str):
-    """`motif` upper-cased, with each bracketed class written as its IUPAC letter:
-    `'[AG]TACNNNNGTG'` -> `'RTACNNNNGTG'`.
-
-    Raises `ValueError` on anything that is neither an IUPAC letter nor a class of A, C, G, T, so
-    a misspelt motif fails loudly instead of matching nothing."""
+def normalise_motif(
+    motif:str, # IUPAC letters and/or bracketed classes such as `[AG]`, in any case
+)->str: # upper-cased, each class written as its IUPAC letter: `'[AG]TAC'` -> `'RTAC'`
+    "`motif` in upper-case IUPAC letters; anything else raises `ValueError`."
     m, out, i = motif.upper(), [], 0
     while i < len(m):
         if m[i] == '[':
@@ -139,9 +123,10 @@ def normalise_motif(motif:str):
     return "".join(out)
 
 
-def revcomp(seq:str):
-    """Reverse complement of a DNA sequence or an IUPAC motif, upper-cased: `R` becomes `Y`,
-    `N` stays `N`. Bracketed classes are accepted and come back as IUPAC letters."""
+def revcomp(
+    seq:str, # a DNA sequence or an IUPAC motif; bracketed classes are accepted
+)->str: # the reverse complement, upper-cased, classes written as IUPAC letters
+    "Reverse complement of a DNA sequence or an IUPAC motif: `R` becomes `Y`, `N` stays `N`."
     if '[' in seq:
         seq = normalise_motif(seq)
     return seq.upper().translate(_COMPLEMENT)[::-1]
@@ -165,23 +150,11 @@ def _get_rebase_motifs():
     return _REBASE_MOTIFS
 
 # %% ../nbs/01_utils.ipynb #21042f37
-def canonical_motif(motif, rebase_motifs=None):
-    """Return the strand `motif` should be reported on.
-
-    A motif and its reverse complement describe the same recognition site and always carry the
-    same statistics, so exactly one of them should appear in the results. Prefer the strand that
-    REBASE uses; if REBASE knows neither (or both), fall back to the alphabetically first strand,
-    which is arbitrary but identical on every run.
-
-    Args:
-        motif (str): an IUPAC motif, e.g. `'GAGACC'` or `'CACNNNNGTAY'`; bracketed classes
-            are accepted and reported as IUPAC letters (`normalise_motif`).
-        rebase_motifs (set, optional): Motif set to match against. Defaults to the
-            REBASE Gold Standard motifs shipped with the package. Pass an explicit set to test or to use a different reference.
-
-    Returns:
-        str: `motif` or its reverse complement.
-    """
+def canonical_motif(
+    motif:str, # an IUPAC motif, e.g. `'GAGACC'`; bracketed classes are accepted
+    rebase_motifs:set|None=None, # motifs to match; default the REBASE Gold Standard set shipped
+)->str: # `motif` or its reverse complement, in IUPAC letters (`normalise_motif`)
+    "The strand to report `motif` on: the one REBASE uses, else the alphabetically first."
     if rebase_motifs is None:
         rebase_motifs = _get_rebase_motifs()
     motif = normalise_motif(motif)
@@ -194,21 +167,12 @@ def canonical_motif(motif, rebase_motifs=None):
     return min(motif, rc)
 
 # %% ../nbs/01_utils.ipynb #3eca7610
-def get_lib_seq_context(seqs,left,right):
-    """
-    Each insert with the vector sequence that flanks it in the plasmid, upper-cased.
-
-    A recognition site can straddle the junction between the random insert and the backbone,
-    so motifs are always searched in `left + insert + right`.
-
-    Args:
-        seqs (list): the inserts.
-        left (str): vector sequence 5' of the insert.
-        right (str): vector sequence 3' of the insert.
-
-    Returns:
-        list: `left + insert + right` for each insert, in input order.
-    """
+def get_lib_seq_context(
+    seqs:list, # the inserts
+    left:str, # vector sequence 5' of the insert
+    right:str, # vector sequence 3' of the insert
+)->list: # `left + insert + right` for each insert, upper-cased, in input order
+    "Each insert inside its vector flanks, as motifs are searched: a site can span the junction."
     left=left.upper()
     right=right.upper()
     lib=[left+r+right for r in seqs]
@@ -237,24 +201,14 @@ def _canonical_pattern(pattern):
     return min((d1, spacer, d2), (d2, spacer, d1))
 
 
-def get_patterns(contiguous=(5, 7), halves=(2, 4), max_spacer=8, min_defined=5, max_defined=8):
-    """The search space: every motif architecture the scan looks for by default.
-
-    A pattern is `(d1, spacer, d2)` -- defined bases, undefined gap, defined bases. The default
-    is 43 patterns: contiguous sites of 5-7 bases, and gapped sites
-    whose halves are 2-4 bases, with 5-8 defined bases in all and a gap of 1-8. It fits
-    837 of the 983 distinct motifs in the REBASE Gold Standard set shipped with the package.
-
-    The arguments widen it. `get_patterns(contiguous=(4, 8), halves=(2, 5), max_spacer=9)`
-    (68 patterns) fits 902; adding `max_defined=9` (77) fits 911, at about 8 times the motifs
-    tested (3.6 million against 460,000 on the larger example library). A wider search is not
-    free at the default thresholds: it adds one-base-longer descriptions of weak or degenerate
-    sites, which steps 3 and 4 do not yet catch, so it is not the default.
-
-    Every pattern is returned in the one form the scan uses -- of a mirror pair the one with the
-    shorter first half, a contiguous pattern as `(k, 0, 0)` -- ordered by number of defined bases,
-    then spacer.
-    """
+def get_patterns(
+    contiguous:tuple=(5, 7), # shortest and longest contiguous site
+    halves:tuple=(2, 4), # shortest and longest half of a gapped site
+    max_spacer:int=8, # longest gap of a gapped site; the shortest is 1
+    min_defined:int=5, # fewest defined bases of a gapped site, both halves together
+    max_defined:int=8, # most defined bases of a gapped site
+)->list: # `(d1, spacer, d2)` in canonical form, by number of defined bases, then spacer
+    "The search space: every motif architecture the scan looks for by default."
     patterns = {(k, 0, 0) for k in range(contiguous[0], contiguous[1] + 1)}
     for a in range(halves[0], halves[1] + 1):
         for b in range(halves[0], halves[1] + 1):
@@ -291,22 +245,13 @@ def _get_filter_for_motif(series, motif, left_context, right_context):
     return series.index.to_series().apply(present)
 
 # %% ../nbs/01_utils.ipynb #8bc924dc
-def get_custom_motif_presence_in_library(short_sequences_list, left_context, right_context, motif_list):
-    """
-    Which of `motif_list` each insert carries, searched with its context and on both strands.
-
-    Args:
-        short_sequences_list (list): the inserts.
-        left_context (str): Left context string to prepend.
-        right_context (str): Right context string to append.
-        motif_list (list): Motif strings using IUPAC codes (e.g. 'AACNNNNCTTT', 'RTACNNNNGTG')
-                           and/or regex character classes (e.g. '[AG]TACNNNNGTG').
-
-    Returns:
-        pd.DataFrame: one row per insert, in input order, indexed by the sequence *with its
-                      context*; one boolean column per motif. A motif that is empty, not a
-                      string, or not a valid regex is all False.
-    """
+def get_custom_motif_presence_in_library(
+    short_sequences_list:list, # the inserts
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    motif_list:list, # motifs in IUPAC letters and/or classes, e.g. `'[AG]TACNNNNGTG'`
+)->pd.DataFrame: # a boolean column per motif; a row per insert, indexed by insert *with flanks*
+    "Which of `motif_list` each insert carries, searched with its flanks and on both strands."
     full_sequences_with_context = get_lib_seq_context(short_sequences_list, left_context, right_context)
 
     valid_full_sequences = [seq for seq in full_sequences_with_context if isinstance(seq, str)]
@@ -343,27 +288,14 @@ def get_custom_motif_presence_in_library(short_sequences_list, left_context, rig
     return presence_df
 
 # %% ../nbs/01_utils.ipynb #25b089de
-def get_log2fc_distribution_by_motif(log2fc_df, left_context, right_context, motif_list, sample_columns=None):
-    """
-    Label each plasmid by the motif it carries (or 'Other') and reshape to long format, for
-    comparing or plotting the log2FC distribution of each motif.
-
-    Args:
-        log2fc_df (pd.DataFrame): DataFrame of log2 fold change values, indexed by short
-                                   sequence (rows=features, columns=samples).
-        left_context (str): Left context string to prepend before motif search.
-        right_context (str): Right context string to append before motif search.
-        motif_list (list): motifs as in `get_custom_motif_presence_in_library`. A plasmid
-                            carrying several is labelled with the LAST of them in motif_list,
-                            the same precedence as `plotting.plot_motif_depletion`.
-        sample_columns (list, optional): Subset of columns (samples) from log2fc_df to include.
-                                          Defaults to all columns.
-
-    Returns:
-        pd.DataFrame: Long-format DataFrame with columns ['sequence', 'Motif_Category',
-                      'sample', 'log2fc']. 'Motif_Category' is one of motif_list or 'Other'.
-                      None if motif presence could not be computed.
-    """
+def get_log2fc_distribution_by_motif(
+    log2fc_df:pd.DataFrame, # log2FC indexed by insert, one column per sample
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    motif_list:list, # motifs as for `get_custom_motif_presence_in_library`
+    sample_columns:list|None=None, # the samples to include; default every column
+)->pd.DataFrame: # 'sequence', 'Motif_Category' (a motif or 'Other'), 'sample', 'log2fc'
+    "Each plasmid's log2FC labelled by the motif it carries, in long format for plotting."
     if sample_columns is None:
         sample_columns = log2fc_df.columns.tolist()
 
@@ -422,23 +354,12 @@ def _motif_pvalues(num_sequences, fraction_depleted, background):
     return binom.sf(k - 1, n, background)
 
 # %% ../nbs/01_utils.ipynb #0812b04b
-def plasmid_background(sequences, log2fc, log2fc_thr=-1):
-    """Each plasmid's background: the fraction of plasmids with a similar insert GC content that
-    are depleted in this sample.
-
-    Plasmids are split into deciles of insert GC (`pd.qcut`); every plasmid gets its decile's
-    rate of log2FC below `log2fc_thr`. A motif's null depletion rate is the mean over its
-    carriers, against which the binomial test of its depleted count is taken.
-
-    Args:
-        sequences (list): the inserts, without the vector flanks.
-        log2fc (array-like): log2 fold change per insert, in the same order (median-normalised, as
-            `calculate_log2fc` returns it and `find_restricted_motifs` uses it).
-        log2fc_thr (float): a plasmid is depleted below this.
-
-    Returns:
-        np.ndarray: one rate per plasmid, strictly between 0 and 1.
-    """
+def plasmid_background(
+    sequences:list, # the inserts, without the vector flanks
+    log2fc, # log2FC per insert, in the same order, median-normalised as `calculate_log2fc` does
+    log2fc_thr:float=-1, # a plasmid is depleted below this
+)->np.ndarray: # one rate per plasmid, strictly between 0 and 1
+    "Each plasmid's background: the depletion rate of the plasmids in its insert-GC decile."
     gc = np.array([(s.count("G") + s.count("C")) / len(s) for s in sequences])
     # qcut gives NaN only when every edge coincides -- one GC content for the whole library,
     # which is then one bin.
@@ -451,40 +372,25 @@ def plasmid_background(sequences, log2fc, log2fc_thr=-1):
     return np.round(rate * 2 ** 20) / 2 ** 20
 
 # %% ../nbs/01_utils.ipynb #b8aa3df2
-def generate_tuple_combinations(a1, a2, b1, b2, c1, c2):
-  """
-  Every `(a, b, c)` with `a1 <= a <= a2`, `b1 <= b <= b2` and `c1 <= c <= c2`.
-
-  Builds `(d1, spacer, d2)` motif patterns in bulk; `get_patterns` is the usual way to get the
-  search space.
-
-  Args:
-    a1, a2: range of the first element, both ends included.
-    b1, b2: range of the second element, both ends included.
-    c1, c2: range of the third element, both ends included.
-
-  Returns:
-    list of tuples, in lexicographic order.
-  """
+def generate_tuple_combinations(
+    a1:int, # smallest first element
+    a2:int, # largest first element
+    b1:int, # smallest second element
+    b2:int, # largest second element
+    c1:int, # smallest third element
+    c2:int, # largest third element
+)->list: # every `(a, b, c)` in the ranges, ends included, in lexicographic order
+  "`(d1, spacer, d2)` patterns in bulk: every `(a, b, c)` with each element in its range."
   range_a = range(a1, a2 + 1)
   range_b = range(b1, b2 + 1)
   range_c = range(c1, c2 + 1)
   return list(itertools.product(range_a, range_b, range_c))
 
 # %% ../nbs/01_utils.ipynb #a800821a
-def filter_symmetric_tuples(list_of_tuples):
-    """
-    Drop a tuple when its mirror (first and third elements swapped) came earlier in the list.
-
-    `(3, 4, 4)` and `(4, 4, 3)` find the same sites, because the scan reads both strands, so only
-    the first one met is kept. A tuple that is its own mirror, such as `(4, 4, 4)`, is kept.
-
-    Args:
-        list_of_tuples: A list of tuples, where each tuple contains three integers.
-
-    Returns:
-        list: the tuples kept, in input order.
-    """
+def filter_symmetric_tuples(
+    list_of_tuples:list, # `(d1, spacer, d2)` tuples
+)->list: # the tuples kept, in input order
+    "Drop a tuple when its mirror (first and third elements swapped) came earlier in the list."
     # The canonical form of a pair is the smaller of a tuple and its mirror.
     seen_canonical_forms = set()
     filtered_list = []
@@ -603,43 +509,13 @@ def _assign_orientations(comp: list[int],
 
 # %% ../nbs/01_utils.ipynb #2bee3446
 def find_iupac_equivalent_motifs(
-    df: pd.DataFrame,
-    max_mismatches: int = 2,
-    motif_col: str = 'motif',
-    sample_col: str = None,
-    consider_rc: bool = True,
-) -> pd.DataFrame:
-    """
-    Find motifs that differ by at most *max_mismatches* nucleotides and collapse
-    them with IUPAC ambiguity codes (within each sample if *sample_col* is given).
-
-    Rules:
-    - Only motifs of the same length are compared.
-    - N positions are skipped when counting mismatches.
-    - When consider_rc=True (default), dist(A, B) = min(dist(A,B), dist(A,rc(B))).
-      If rc(B) was closer, B is flipped before merging so all motifs in a group
-      share a consistent strand orientation.
-    - Groups are found via connected components (transitivity: A~B and B~C
-      -> all three merged even if A and C are > max_mismatches apart).
-    - The merged motif is spelled on the strand of the group's first row in `df`.
-
-    Args:
-        df: DataFrame with at least *motif_col*, e.g. the motif table returned by
-            find_restricted_motifs. Optional num_sequences / avg_log2fc /
-            fraction_depleted columns are aggregated per group.
-        max_mismatches: 1 or 2 recommended.
-        motif_col: column containing motif sequences.
-        sample_col: column with the sample / strain identifier; None treats the
-            whole df as one sample.
-        consider_rc: whether to also compare against the reverse complement.
-
-    Returns:
-        DataFrame with one row per merged group (including singletons, n_merged == 1):
-        [sample_col,] merged_motif, original_motifs, original_motifs_oriented,
-        n_merged, max_pairwise_mismatches, rc_used, and when available
-        total_sequences (sum), avg_log2fc_weighted (weighted by num_sequences when present)
-        and avg_fraction_depleted (unweighted mean).
-    """
+    df:pd.DataFrame, # a table of motifs, e.g. from `find_restricted_motifs`
+    max_mismatches:int=2, # motifs this many mismatches apart or fewer are linked; 1 or 2 advised
+    motif_col:str='motif', # the column holding the motifs
+    sample_col:str|None=None, # the sample column, each sample merged on its own; None: one sample
+    consider_rc:bool=True, # also compare each motif with the other's reverse complement
+)->pd.DataFrame: # one row per group of linked motifs, singletons included
+    "Merge same-length motifs a few mismatches apart into one IUPAC motif each."
     records = []
     groups = df.groupby(sample_col, sort=False) if sample_col else [(None, df)]
 

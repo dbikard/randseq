@@ -16,22 +16,22 @@ import os
 from .utils import calculate_log2fc, _get_filter_for_motif, get_custom_motif_presence_in_library
 
 # %% ../nbs/02_plotting.ipynb #8d97e736
-def plot_motif_analysis(counts_df, sample_col, ref_col, motifs,
-                        left_context, right_context,
-                        title_main=None,
-                        pseudocount=1,
-                        log2fc_count_threshold=20, log2fc_pseudocount=1,
-                        figsize=(12, 6), save_filename=None, 
-                        distribution_plot_log_xscale=False):
-    """
-    Generates two side-by-side subplots with consistent motif colors:
-    1. Scatter plot of normalized counts (sample vs reference).
-    2. Histograms (density) of log2 Fold Change (sample_col / ref_col) for all sequences and each motif,
-       median-normalised as `calculate_log2fc` returns it.
-    If title_main is None, it's auto-generated from sample_col and ref_col.
-
-    Returns (fig, axes), or (None, None) when counts_df is empty or lacks either column.
-    """
+def plot_motif_analysis(
+    counts_df:pd.DataFrame, # read counts, one row per insert, one column per sample
+    sample_col:str, # the recipient sample to plot
+    ref_col:str, # the input-library column it is compared with
+    motifs:pd.DataFrame|None, # motifs to highlight, in a 'motif' column (`find_restricted_motifs`)
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    title_main:str|None=None, # figure title; default "Motif Analysis: <sample_col> vs <ref_col>"
+    pseudocount:float=1, # added to the counts per million of the scatter, before the log
+    log2fc_count_threshold:int=20, # `count_threshold` of `calculate_log2fc`, for the histogram
+    log2fc_pseudocount:float=1, # `pseudocount` of `calculate_log2fc`, for the histogram
+    figsize:tuple=(12, 6), # figure size, in inches
+    save_filename:str|None=None, # also save the figure to this file, at 300 dpi
+    distribution_plot_log_xscale:bool=False, # log scale on the histogram's x axis
+)->tuple: # `(fig, axes)`; `(None, None)` when `counts_df` is empty or lacks either column
+    "Donor against recipient counts with each motif's carriers highlighted, beside their log2FC."
 
     if not isinstance(counts_df, pd.DataFrame) or counts_df.empty: return None, None
     if not all(col in counts_df.columns for col in [sample_col, ref_col]): return None, None
@@ -152,27 +152,17 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, motifs,
 # %% ../nbs/02_plotting.ipynb #ce39ffcd
 _CB_PALETTE = ["#F0A226", "#0A795B", "#800074"]
 
-def plot_motif_depletion(counts_df, sample_col, ref_col, motif_list,
-                         left_context, right_context,
-                         pseudocount=1, palette=_CB_PALETTE):
-    """Log-log scatterplot of one sample's counts vs. a reference, colored by
-    which (if any) of a user-supplied list of candidate motifs each sequence
-    contains. Complements plot_motif_analysis / find_restricted_motifs: use it
-    to check candidate motifs directly instead of relying on the algorithm.
-
-    Args:
-        counts_df: UMI count table, one row per sequence, one column per sample.
-        sample_col, ref_col: column names for the recipient/donor pair to compare.
-        motif_list: list of IUPAC-style motif patterns ("N" = any base). If a
-            sequence contains several, it is colored by the last one in the list.
-        left_context, right_context: library context flanking each sequence,
-            used when scanning for motif matches.
-        pseudocount: added to normalized counts before log-scaling (avoids log(0)).
-        palette: one color per motif; must be at least len(motif_list) long.
-
-    Returns:
-        plotnine.ggplot object (save with p.save(filename, width=6, height=5, units="in")).
-    """
+def plot_motif_depletion(
+    counts_df:pd.DataFrame, # read counts, one row per insert, one column per sample
+    sample_col:str, # the recipient sample to plot
+    ref_col:str, # the input-library column it is compared with
+    motif_list:list, # motifs to colour by, in IUPAC letters and/or bracketed classes
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    pseudocount:float=1, # added to the counts per million, before the log
+    palette:list=_CB_PALETTE, # one colour per motif, at least as many as `motif_list`
+):
+    "Log-log plot of one sample's counts against the reference, coloured by the motifs you name."
     from plotnine import (
         aes, element_blank, element_text, geom_abline, geom_point, ggplot,
         guide_legend, guides, labs, scale_color_manual, scale_x_log10,

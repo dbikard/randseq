@@ -25,41 +25,16 @@ from .utils import (_IUPAC_COLLAPSE, _IUPAC_EXPAND, revcomp, calculate_log2fc, g
 
 # %% ../nbs/00_core.ipynb #0b75ece4
 def _scan_candidates(
-    pattern,
-    encoded_library,
-    fc_values,
-    background,
-    log2fc_thr,
-    score_thr,
-    min_support,
-    parallel=True,
-):
-    """
-    Scores all motifs of one pattern and keeps the candidates with
-    fraction_depleted >= score_thr and num_sequences >= min_support.
-
-    Args:
-        pattern (tuple): (d1, spacer, d2) motif pattern.
-        encoded_library (tuple): (fwd, rc) arrays from `encode_library` (sequences with context).
-        fc_values (list): log2FC of each sequence, in library order.
-        background (np.ndarray): each sequence's expected depletion rate, from
-            `plasmid_background`.
-        log2fc_thr (float): log2FC below which a sequence counts as depleted.
-        score_thr (float): minimum fraction_depleted (inclusive, `>=`).
-        min_support (int): minimum number of sequences (inclusive, `>=`).
-        parallel (bool): passed to `_scan_pattern`; False inside a pool worker.
-
-    Returns:
-        (pd.DataFrame, np.ndarray, tuple): the surviving candidates -- 'motif',
-            'fraction_depleted', 'num_sequences', 'avg_log2fc', 'p_value' and 'pattern' (the
-            pattern as a string) -- the p-value of *every* motif that had enough support to be a
-            test, survivor or not, and the pattern's totals from `_scan_pattern`, so that later
-            steps can look motifs of this pattern up rather than scan it again.
-
-    Both are returned because the Benjamini-Hochberg correction needs the full set of tests, and
-    only this function ever sees it: the candidates that fail the score threshold are discarded
-    here, but they were still tested, and a correction that ignored them would be wrong.
-    """
+    pattern:tuple, # the `(d1, spacer, d2)` shape to scan
+    encoded_library:tuple, # `(fwd, rc)` from `encode_library`, of the sequences with their flanks
+    fc_values, # log2FC of each sequence, in library order
+    background:np.ndarray, # each sequence's expected depletion rate (`plasmid_background`)
+    log2fc_thr:float, # a sequence is depleted below this
+    score_thr:float, # lowest `fraction_depleted` a candidate keeps (`>=`)
+    min_support:int, # fewest carriers a motif is tested on (`>=`)
+    parallel:bool=True, # passed to `_scan_pattern`; False inside a pool worker
+)->tuple: # `(candidates, p-values of every motif tested, the pattern's totals)`
+    "Score every motif of one pattern; keep those reaching `score_thr` on `min_support` plasmids."
     fc = np.asarray(fc_values, dtype=float)
     totals = _scan_pattern(encoded_library, pattern, fc, background,
                           log2fc_thr, parallel)
@@ -74,29 +49,16 @@ def _scan_candidates(
     return kept, _motif_pvalues(n_seqs[tested], frac, bg_sum[tested] / n_seqs[tested]), totals
 
 # %% ../nbs/00_core.ipynb #b4ea79aa
-def _variant_profile(motifs, pattern, encoded, fc, background, log2fc_thr, totals=None):
-    """Support, depletion score and background for each of a set of related motifs.
-
-    Read off the pattern's totals from `_scan_pattern` -- the counts step 2 makes -- so a
-    variant is scored exactly as it would have been had its pattern been scanned there.
-
-    Args:
-        motifs (list): motif strings, all of the same `pattern`.
-        pattern (tuple): the `(d1, spacer, d2)` shape they share.
-        encoded (tuple): `(fwd, rc)` from `encode_library`.
-        fc (np.ndarray): log2 fold change per library sequence, in the same order.
-        background (np.ndarray): each sequence's expected depletion rate, from
-            `plasmid_background`.
-        log2fc_thr (float): a plasmid is depleted below this.
-        totals (dict): totals by canonical pattern, for this library, `fc`, `background` and
-            threshold. Shared across calls, it makes every pattern scanned at most once, and the
-            patterns step 2 scanned never again. Filled in place.
-
-    Returns:
-        list: one `(motif, n_plasmids, score, background)` per motif, in the order given, the
-        background being the carriers' mean. A motif that has no code (an IUPAC base, or a
-        defined base in the spacer) gets `n=0` and `nan` for the other two.
-    """
+def _variant_profile(
+    motifs:list, # motif strings, all of the same `pattern`
+    pattern:tuple, # the `(d1, spacer, d2)` shape they share
+    encoded:tuple, # `(fwd, rc)` from `encode_library`
+    fc:np.ndarray, # log2FC per library sequence, in the same order
+    background:np.ndarray, # each sequence's expected depletion rate (`plasmid_background`)
+    log2fc_thr:float, # a plasmid is depleted below this
+    totals:dict|None=None, # the scan's totals by canonical pattern, shared; filled in place
+)->list: # `(motif, n_plasmids, score, carriers' mean background)` per motif, in the order given
+    "Support, depletion score and background of each of a set of related motifs."
     totals = {} if totals is None else totals
     canon = _canonical_pattern(pattern)
     if canon not in totals:
@@ -115,19 +77,12 @@ def _variant_profile(motifs, pattern, encoded, fc, background, log2fc_thr, total
     return out
 
 # %% ../nbs/00_core.ipynb #f0204ef3
-def _verdict(profile, score_thr, min_support):
-    """Call a variant profile 'mixture', 'genuine' or 'unknown'.
-
-    Args:
-        profile (list): `(motif, n, score, ...)` from `_variant_profile`; only `n` and `score`
-            are read.
-        score_thr (float): the depletion score a candidate had to reach to be here.
-        min_support (int): a variant on fewer plasmids than this is not judged.
-
-    Returns:
-        tuple: the verdict, and the spread across judgeable variants (`None` when fewer than
-        two can be judged).
-    """
+def _verdict(
+    profile:list, # `(motif, n, score, ...)` from `_variant_profile`; only `n` and `score` are read
+    score_thr:float, # the depletion score a candidate had to reach to be here
+    min_support:int, # a variant on fewer plasmids than this is not judged
+)->tuple: # the verdict, and the spread of the judged variants (None when fewer than two)
+    "Call a variant profile 'mixture', 'genuine' or 'unknown'."
     judged = [p[2] for p in profile if p[1] >= min_support]
     if len(judged) < 2:
         return "unknown", None
@@ -136,8 +91,11 @@ def _verdict(profile, score_thr, min_support):
     return ("mixture" if split else "genuine"), spread
 
 # %% ../nbs/00_core.ipynb #a7b0c0fa
-def _undefined_positions(motif, pattern):
-    """Each undefined position worth testing on a candidate, as (four variants, their pattern)."""
+def _undefined_positions(
+    motif:str, # the candidate
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+)->list: # `(four variants, their pattern)` for each position
+    "Each undefined position worth testing on a candidate."
     d1, spacer, d2 = pattern
     width = d1 + spacer + d2
     jobs = [([b + motif for b in "ACGT"], (width + 1, 0, 0) if spacer == 0 else (d1 + 1, spacer, d2)),
@@ -152,24 +110,18 @@ def _undefined_positions(motif, pattern):
     return jobs
 
 # %% ../nbs/00_core.ipynb #b04daf67
-def _is_mixture(motif, pattern, encoded_library, fc_values, background, log2fc_thr=-1,
-               score_thr=0.5, min_support=5, totals=None):
-    """Does fixing one position next to this motif split its carriers into sites and non-sites?
-
-    Args:
-        motif (str): the candidate.
-        pattern (tuple): its `(d1, spacer, d2)` shape.
-        encoded_library (tuple): `(fwd, rc)` from `encode_library`.
-        fc_values (np.ndarray): log2 fold change per library sequence.
-        background (np.ndarray): each sequence's expected depletion rate, from
-            `plasmid_background`. The verdict compares the variants with each other and does not
-            read it; it completes the totals of a pattern scanned here, which rule 3 shares.
-        log2fc_thr (float), score_thr (float), min_support (int): as elsewhere in the step.
-        totals (dict): shared pattern totals, as for `_variant_profile`.
-
-    Returns:
-        bool: True when some position's four bases split.
-    """
+def _is_mixture(
+    motif:str, # the candidate
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+    encoded_library:tuple, # `(fwd, rc)` from `encode_library`
+    fc_values:np.ndarray, # log2FC per library sequence
+    background:np.ndarray, # expected depletion per sequence: unread by the verdict, kept in totals
+    log2fc_thr:float=-1, # a plasmid is depleted below this
+    score_thr:float=0.5, # as for `_verdict`
+    min_support:int=5, # as for `_verdict`
+    totals:dict|None=None, # shared pattern totals, as for `_variant_profile`
+)->bool: # True when the four bases at some position split
+    "Does fixing one position next to this motif split its carriers into sites and non-sites?"
     for variants, vpat in _undefined_positions(motif, pattern):
         if sum(vpat) > encoded_library[0].shape[1]:  # the padded motif is wider than the insert
             continue
@@ -220,13 +172,11 @@ def _parent_motifs(motif, pattern):
     return sorted(set(out))
 
 # %% ../nbs/00_core.ipynb #ed02ec03
-def _relax_positions(motif, pattern):
-    """The defined bases of `motif` that can be put back to N, leaving a valid pattern.
-
-    Every base of a contiguous motif -- an interior one becomes a one-base spacer -- and, for a
-    gapped motif, the outer base and the spacer-side base of each half, as long as the half keeps
-    a defined base. These are the positions rule 1 tests from the other side.
-    """
+def _relax_positions(
+    motif:str, # the candidate
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+)->list: # positions in `motif`
+    "The defined bases of `motif` that can be put back to N, leaving a valid pattern."
     d1, spacer, d2 = pattern
     if spacer == 0:
         return list(range(len(motif)))
@@ -257,23 +207,12 @@ def _site_or_background(n, k, site_rate, background_rate):
     return "site" if llr > cut else "non-site" if llr < -cut else "unknown"
 
 
-def _classify_bases(profile, motif, min_support):
-    """'site', 'non-site' or 'unknown' for each base other than `motif`'s at one position.
-
-    Each base's carriers are compared under two models -- depleted at the site's rate, or at
-    their own background -- by their log-likelihood ratio. The site's rate is the candidate's
-    own, re-estimated once from the candidate pooled with the bases first classified site-like.
-
-    Args:
-        profile (list): `(motif, n, score, background)` for the four bases, from
-            `_variant_profile`.
-        motif (str): the candidate, one of the four.
-        min_support (int): a base carried by fewer plasmids is not classified.
-
-    Returns:
-        dict: other motif -> class, for those with at least `min_support` carriers; `None` when
-        the candidate itself has too few.
-    """
+def _classify_bases(
+    profile:list, # `(motif, n, score, background)` for the four bases, from `_variant_profile`
+    motif:str, # the candidate, one of the four
+    min_support:int, # a base carried by fewer plasmids is not classified
+)->dict|None: # other motif -> class, if carried `min_support` times; None if `motif` is not
+    "'site', 'non-site' or 'unknown' for each base other than `motif`'s at one position."
     own = next((p for p in profile if p[0] == motif), None)
     if own is None or own[1] < min_support:
         return None
@@ -289,26 +228,18 @@ def _classify_bases(profile, motif, min_support):
     return classify(clip(sum(p[1] * p[2] for p in pooled) / n, n))
 
 
-def _classify_positions(motif, positions, pattern, encoded_library, fc_values, background,
-                       log2fc_thr=-1, min_support=5, totals=None):
-    """For each position, the class and carriers of every base `motif` does not allow there.
-
-    At position `i`, each base `motif` does not allow gives a variant -- `motif` with that base at
-    `i` -- and `_classify_bases` classifies it against `motif`. A motif of A, C, G and T is profiled
-    from the scan's counts (`_variant_profile`); a motif with an IUPAC letter is profiled on the
-    carriers of its instances (`_union_profile`).
-
-    Args:
-        motif (str): the candidate, IUPAC letters allowed at its defined positions.
-        positions (list): defined positions of `motif` to classify.
-        pattern (tuple): its `(d1, spacer, d2)` shape.
-        encoded_library, fc_values, background, log2fc_thr, min_support, totals: as for
-            `_is_mixture`.
-
-    Returns:
-        dict: position -> {base: (class, n carriers)}, for the bases with at least `min_support`
-        carriers; empty at every position when `motif` itself has fewer.
-    """
+def _classify_positions(
+    motif:str, # the candidate; IUPAC letters allowed at its defined positions
+    positions:list, # defined positions of `motif` to classify
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+    encoded_library:tuple, # as for `_is_mixture`
+    fc_values:np.ndarray, # as for `_is_mixture`
+    background:np.ndarray, # as for `_is_mixture`
+    log2fc_thr:float=-1, # as for `_is_mixture`
+    min_support:int=5, # as for `_is_mixture`
+    totals:dict|None=None, # as for `_is_mixture`
+)->dict: # position -> {base: (class, carriers)}; empty at each when `motif` has too few carriers
+    "For each position, the class and carriers of every base `motif` does not allow there."
     alts = {i: [motif[:i] + b + motif[i + 1:] for b in "ACGT" if b not in _IUPAC_EXPAND[motif[i]]]
             for i in positions}
     motifs = [motif] + [v for vs in alts.values() for v in vs]
@@ -326,9 +257,17 @@ def _classify_positions(motif, positions, pattern, encoded_library, fc_values, b
     return out
 
 
-def _is_over_specified(motif, pattern, encoded_library, fc_values, background, log2fc_thr=-1,
-                      min_support=5, totals=None):
-    """Does `motif` have a defined base at which every other base behaves like the site?"""
+def _is_over_specified(
+    motif:str, # the candidate
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+    encoded_library:tuple, # as for `_is_mixture`
+    fc_values:np.ndarray, # as for `_is_mixture`
+    background:np.ndarray, # as for `_is_mixture`
+    log2fc_thr:float=-1, # as for `_is_mixture`
+    min_support:int=5, # as for `_is_mixture`
+    totals:dict|None=None, # as for `_is_mixture`
+)->bool: # True when, at one of `_relax_positions`, every other base is site-like
+    "Does `motif` have a defined base at which every other base behaves like the site?"
     by_position = _classify_positions(motif, _relax_positions(motif, pattern), pattern,
                                      encoded_library, fc_values, background, log2fc_thr,
                                      min_support, totals)
@@ -377,12 +316,15 @@ def _instance_presence(encoded, motifs, patterns):
     return presence, handled
 
 
-def _carriers(encoded, motifs, patterns, log2fc_series, left_context, right_context):
-    """Boolean (n_sequences, n_motifs): which plasmids carry each motif, on either strand.
-
-    Read from the window codes of each motif's instances (`_instance_presence`); a motif whose
-    pattern is unknown falls back to a regex over the sequences with their flanks.
-    """
+def _carriers(
+    encoded:tuple, # `(fwd, rc)` from `encode_library`
+    motifs:list, # motif strings, IUPAC letters allowed
+    patterns:list, # each motif's `(d1, spacer, d2)`, or None where unknown
+    log2fc_series:pd.Series, # log2FC indexed by insert, read by the regex fallback
+    left_context:str, # vector sequence 5' of the insert, for the regex fallback
+    right_context:str, # vector sequence 3' of the insert, for the regex fallback
+)->np.ndarray: # boolean, (n_sequences, n_motifs)
+    "Which plasmids carry each motif, on either strand."
     presence, handled = _instance_presence(encoded, motifs, patterns)
     for j in np.flatnonzero(~handled):
         presence[:, j] = _get_filter_for_motif(
@@ -390,38 +332,19 @@ def _carriers(encoded, motifs, patterns, log2fc_series, left_context, right_cont
     return presence
 
 # %% ../nbs/00_core.ipynb #8bc15550
-def _filter_redundant_patterns(df, log2fc_series, left_context, right_context,
-                              log2fc_thr=-1, score_thr=0.5, min_support=5,
-                              encoded=None, totals=None, background=None):
-    """Keep one description per site, by three rules.
-
-    1. **A mixture is not a site.** A candidate is dropped when fixing one position next to it
-       splits the plasmids that carry it into depleting and not (`_is_mixture`).
-    2. **A one-base extension of a site is redundant.** A candidate is dropped when it is a
-       candidate that survived rule 1 with one more defined base (found by looking up
-       `_parent_motifs`): rule 1 found that site's neighbouring positions carry
-       nothing, so pinning one adds nothing.
-    3. **A motif with an uninformative base is not the site.** A candidate is dropped when, at one
-       of its defined bases, every other base behaves like the site (`_is_over_specified`).
-
-    No rule depends on the order the candidates arrive in.
-
-    Args:
-        df (pd.DataFrame): candidates, with 'motif' and 'pattern'.
-        log2fc_series (pd.Series): log2 fold change, indexed by insert sequence.
-        left_context (str), right_context (str): the vector flanks.
-        log2fc_thr (float): a plasmid is depleted below this.
-        score_thr (float): the score a candidate had to reach, reused as the bar a variant must
-            clear and as the spread that marks a profile a mixture.
-        min_support (int): a variant on fewer plasmids than this is not judged.
-        encoded (tuple): the library from `encode_library`, if the caller already has it.
-        totals (dict): shared pattern totals, as for `_variant_profile`.
-        background (np.ndarray): each plasmid's expected depletion rate; `plasmid_background` of
-            `log2fc_series` when not given.
-
-    Returns:
-        pd.DataFrame: `df` without the redundant rows, in the original row order.
-    """
+def _filter_redundant_patterns(
+    df:pd.DataFrame, # candidates, with 'motif' and 'pattern'
+    log2fc_series:pd.Series, # log2FC indexed by insert
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    log2fc_thr:float=-1, # a plasmid is depleted below this
+    score_thr:float=0.5, # the candidates' bar, reused for a variant's and a mixture's spread
+    min_support:int=5, # a variant on fewer plasmids than this is not judged
+    encoded:tuple|None=None, # the library from `encode_library`, if the caller has it
+    totals:dict|None=None, # shared pattern totals, as for `_variant_profile`
+    background:np.ndarray|None=None, # expected depletion per plasmid; default `plasmid_background`
+)->pd.DataFrame: # `df` without the redundant rows, in the original row order
+    "Keep one description per site, by rules 1 to 3."
     if df.empty:
         return df
     motifs = df["motif"].tolist()
@@ -452,40 +375,19 @@ def _filter_redundant_patterns(df, log2fc_series, left_context, right_context,
     return df.iloc[keep]
 
 # %% ../nbs/00_core.ipynb #194b899f
-def _filter_explained_candidates(candidates_df, log2fc_series, left_context, right_context,
-                                log2fc_thr=-1, score_thr=0.7, min_support=3,
-                                encoded=None, p_threshold=0.05, background=None):
-    """Drop candidates whose depletion is fully accounted for by stronger candidates.
-
-    Candidates are taken strongest first. Each `X` is restricted to the plasmids that carry
-    **none** of the stronger candidates still standing; if what is left no longer reaches
-    `score_thr`, or is not depleted beyond its own background at `p_threshold`, `X`'s score
-    was borrowed and `X` is removed. Otherwise it stands, and the plasmids that carry it join the
-    set later candidates are tested against.
-
-    After the pass, every survivor is tested again against the union of *all* the others,
-    weakest first, removing one at a time: the pass tests a candidate only against those ranked
-    above it, and a shadow can rank above the site it shadows.
-
-    Args:
-        candidates_df: candidates, with 'motif' and (optionally) 'pattern' columns.
-        log2fc_series: the full log2FC series, indexed by sequence.
-        left_context, right_context: the vector sequence flanking the insert.
-        log2fc_thr: a plasmid is depleted below this.
-        score_thr: fraction of a candidate's leftover plasmids that must still be depleted.
-        min_support: not used: a candidate's support was established when it became one.
-            Accepted so the step takes the same thresholds as the rest of the pipeline.
-        encoded: the library from `encode_library`, if the caller already has it.
-        p_threshold: the leftover must also be depleted beyond its background -- the mean
-            background of its plasmids -- at this p-value. `find_restricted_motifs` passes the
-            scan's Benjamini-Hochberg cutoff.
-        background: each plasmid's expected depletion rate; `plasmid_background` of
-            `log2fc_series` when not given.
-
-    Returns:
-        (kept_df, explanations) where explanations maps a dropped motif to
-        (explaining motif, plasmids left, score on them).
-    """
+def _filter_explained_candidates(
+    candidates_df:pd.DataFrame, # candidates, with 'motif' and optionally 'pattern'
+    log2fc_series:pd.Series, # log2FC indexed by insert
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    log2fc_thr:float=-1, # a plasmid is depleted below this
+    score_thr:float=0.7, # share of a candidate's leftover plasmids that must still be depleted
+    min_support:int=3, # not used; accepted so the step takes the pipeline's thresholds
+    encoded:tuple|None=None, # the library from `encode_library`, if the caller has it
+    p_threshold:float=0.05, # the leftover must beat its carriers' mean background at this p
+    background:np.ndarray|None=None, # expected depletion per plasmid; default `plasmid_background`
+)->tuple: # `(kept, explanations)`: dropped motif -> (explained by, plasmids left, their score)
+    "Drop candidates whose depletion is fully accounted for by stronger candidates."
     if len(candidates_df) < 2:
         return candidates_df, {}     # nothing that could explain anything
 
@@ -728,25 +630,17 @@ def _union_profile(motifs, pattern, encoded, fc, background, log2fc_thr):
             for m, k, d, b in zip(motifs, n, depleted, bg_sum)]
 
 
-def _generalise_motif(motif, pattern, encoded_library, fc_values, background, log2fc_thr=-1,
-                     min_support=5, totals=None):
-    """`motif` with each degenerate position written as the IUPAC letter of its site-like bases.
-
-    At every defined position the bases `motif` does not allow are classified
-    (`_classify_positions`). Where some, but not all, are site-like, they join the bases allowed
-    there. One position changes at a time -- the one whose site-like bases have the most carriers,
-    the first on a tie -- and the merged motif is classified again, on its own carriers, until no
-    position changes.
-
-    Args:
-        motif (str): a called motif.
-        pattern (tuple): its `(d1, spacer, d2)` shape.
-        encoded_library, fc_values, background, log2fc_thr, min_support, totals: as for
-            `_is_mixture`.
-
-    Returns:
-        str: the merged motif, or `motif` itself when no position is degenerate.
-    """
+def _generalise_motif(
+    motif:str, # a called motif
+    pattern:tuple, # its `(d1, spacer, d2)` shape
+    encoded_library:tuple, # as for `_is_mixture`
+    fc_values:np.ndarray, # as for `_is_mixture`
+    background:np.ndarray, # as for `_is_mixture`
+    log2fc_thr:float=-1, # as for `_is_mixture`
+    min_support:int=5, # as for `_is_mixture`
+    totals:dict|None=None, # as for `_is_mixture`
+)->str: # the merged motif, or `motif` itself when no position is degenerate
+    "`motif` with each degenerate position written as the IUPAC letter of its site-like bases."
     defined = [i for i, c in enumerate(motif) if c != "N"]
     while True:
         best = None
@@ -836,13 +730,12 @@ def _merge_degenerate_calls(table, log2fc_series, left_context, right_context, e
     return out.sort_values(["called", "q_value"], ascending=[False, True], kind="stable")
 
 # %% ../nbs/00_core.ipynb #66eeb538
-def call_reason(row, q_threshold=0.05, score_thr=0.5):
-    """Why a row of the result table is called or not, in a few words.
-
-    A call needs q below `q_threshold` and the lower bound on the depleted fraction at `score_thr`
-    or above. The reason names each test the row fails, with its numbers, or says "called"; a called row with bimodal carriers adds a note, since bimodality does not
-    block a call.
-    """
+def call_reason(
+    row:pd.Series, # a row of the result table with every column (`all_motifs=True`)
+    q_threshold:float=0.05, # a call needs q below this
+    score_thr:float=0.5, # and the lower bound on the depleted fraction at this or above
+)->str: # "called", or each failed test with its numbers; a bimodal call adds a note
+    "Why a row of the result table is called or not, in a few words."
     n = int(row["num_sequences"])
     failed = []
     if not row["q_value"] < q_threshold:
@@ -873,14 +766,16 @@ def _result_view(table, all_motifs, q_threshold, score_thr):
 
 # %% ../nbs/00_core.ipynb #3bfb4529
 class TooManyCandidatesError(RuntimeError):
-    """Raised when step 3 leaves more candidates than step 4 will compare.
+    "Raised when step 3 leaves more candidates than step 4 will compare."
 
-    The candidate table is available as `.candidates` for inspection. A count this large
-    usually means the thresholds are too loose for the sample, not that the strain has
-    thousands of sites.
-    """
-
-    def __init__(self, n_candidates, max_candidates, log2fc_thr, score_thr, min_support, candidates):
+    def __init__(self,
+                 n_candidates:int, # how many candidates step 3 left; kept as `.n_candidates`
+                 max_candidates:int, # the limit they exceed; kept as `.max_candidates`
+                 log2fc_thr:float, # the run's thresholds, quoted in the message
+                 score_thr:float, # quoted in the message
+                 min_support:int, # quoted in the message
+                 candidates:pd.DataFrame, # step 3's candidate table; kept as `.candidates`
+                ):
         self.n_candidates = n_candidates
         self.max_candidates = max_candidates
         self.candidates = candidates
@@ -897,72 +792,21 @@ class TooManyCandidatesError(RuntimeError):
         )
 
 # %% ../nbs/00_core.ipynb #e7d6ec42
-def find_restricted_motifs(log2fc_series,
-                           left_context_str,
-                           right_context_str,
-                           n_jobs=1,
-                           patterns=None,
-                           log2fc_thr=-0.5,
-                           min_support=5,
-                           score_thr=0.5,
-                           max_candidates=5000,
-                           q_threshold=0.05,
-                           encoded_library=None,
-                           all_motifs=False
-                           ):
-    """The motifs one sample restricts: steps 2 to 4 and reporting on a log2FC series.
-
-    It expects log2FC as `calculate_log2fc` returns them (median-normalised); normalise your own
-    values the same way if you compute them elsewhere. Every pattern is scanned over the inserts
-    with their flanks (step 2); the candidates are reduced to one description per site (step 3)
-    and cleared of those whose depletion a stronger candidate accounts for (step 4); the
-    survivors are put on their canonical strand and scored, and the called variants of a
-    degenerate site are reported as one IUPAC motif. Every test is against a GC-matched
-    background: each plasmid's is the depletion rate of the plasmids in its insert-GC
-    decile (`plasmid_background`), and a set of plasmids is tested against their mean.
-
-    Args:
-        log2fc_series (pd.Series): log2 fold change, indexed by insert sequence, median-normalised
-            as `calculate_log2fc` returns it. It is used as given.
-        left_context_str, right_context_str (str): the vector flanks of the insert.
-        n_jobs (int): processes used to scan the patterns. 1 (default) runs in this process.
-            A pattern takes about a second on a 30k-sequence library, so more is rarely worth
-            the startup cost.
-        patterns (list): the shapes to search, as `(d1, spacer, d2)`. Defaults to
-            `get_patterns()`. A pattern and its mirror find the same sites, so each is searched
-            once, in one form: `(4, 4, 3)` is searched as `(3, 4, 4)`.
-        log2fc_thr (float): a plasmid counts as depleted below this, relative to the sample's
-            median plasmid. Default -0.5: low enough to see weakly restricting systems such as BREX,
-            which a -1 threshold misses.
-        min_support (int): minimum plasmids for a motif to be considered. With
-            every carrier depleted, the lower bound on the depleted fraction is 0.22, 0.37, 0.47
-            and 0.55 for 2 to 5 carriers, so 5 is the smallest support that can be called at the
-            default score threshold of 0.5 (4 at 0.45, 7 at 0.65). Lower only adds candidates and
-            runtime: E1114 on the 20 nt library exceeds `max_candidates` at 2 to 4.
-        score_thr (float): at least this fraction of the plasmids carrying a
-            candidate must be depleted, and a call must show it with confidence (the lower bound
-            `fraction_depleted_lower` reaches it). Default 0.5.
-        max_candidates (int): the most candidates step 3 may hand to step 4, whose cost grows
-            faster than their number. Past it the pipeline raises `TooManyCandidatesError` rather
-            than return the candidates as a table that would look like a result; they ride on the
-            exception as `.candidates`. A caller screening many strains should catch it and record
-            that strain as "no confident call". The default, 5000, is above the 3,258 candidates
-            that the busiest strain of the example data (E1114, 20 nt library) brings at the
-            default thresholds.
-        q_threshold (float): a motif is marked `called` when its Benjamini-Hochberg q-value,
-            computed against its carriers' GC-matched background and over every motif the scan
-            tested, falls below this.
-        encoded_library (tuple): `encode_library(get_lib_seq_context(log2fc_series.index,
-            left_context_str, right_context_str))`, if the caller already has it. Strains
-            screened with the same library and flanks share it, so a panel of strains encodes it once.
-            It must describe exactly `log2fc_series.index`, in order.
-        all_motifs (bool): return every scored motif, called or not, with every column.
-
-    Returns:
-        pd.DataFrame: by default the called motifs, one row each, sorted by q then motif: 'motif',
-        'num_sequences', 'fraction_depleted', 'avg_log2fc', 'q_value'. With `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
-        others `_annotate_significance` adds, 'merged_from', and 'reason' (`call_reason`).
-    """
+def find_restricted_motifs(
+    log2fc_series:pd.Series, # log2FC indexed by insert, median-normalised (`calculate_log2fc`)
+    left_context_str:str, # vector sequence 5' of the insert
+    right_context_str:str, # vector sequence 3' of the insert
+    n_jobs:int=1, # processes scanning the patterns; 1 scans in this process
+    patterns:list|None=None, # `(d1, spacer, d2)` shapes to search, or one; default `get_patterns()`
+    log2fc_thr:float=-0.5, # a plasmid counts as depleted below this
+    min_support:int=5, # fewest carriers a motif is scored on
+    score_thr:float=0.5, # share of carriers a candidate needs depleted, and a call its lower bound
+    max_candidates:int=5000, # most candidates step 3 may hand to step 4; past it, raise
+    q_threshold:float=0.05, # a motif is called when its q-value is below this
+    encoded_library:tuple|None=None, # the library from `encode_library`, if already encoded
+    all_motifs:bool=False, # return every scored motif with every column, not only the calls
+)->pd.DataFrame: # the called motifs, one row each (*Reading the result table*)
+    "The motifs one sample restricts: steps 2 to 4 and reporting, on a log2FC series."
     candidates = pd.DataFrame(columns=['motif', 'fraction_depleted', 'num_sequences',
                                        'avg_log2fc', 'pattern'])
     report = functools.partial(_annotate_significance, log2fc_thr=log2fc_thr,

@@ -7,6 +7,10 @@ once, and the output is a single table. The notebooks document each step.
 
 ### Breaking changes
 
+- The main functions are importable from the package: `from randseq import calculate_log2fc,
+  find_restricted_motifs, plot_motif_analysis` (also `get_patterns`, `plot_motif_depletion`,
+  `plan_library`, `get_example_data_dir`, `TooManyCandidatesError`).
+
 - `find_restricted_motifs` returns one table, not a `(fixed, flex)` tuple: the called motifs, in
   five columns (`motif`, `num_sequences`, `fraction_depleted`, `avg_log2fc`, `q_value`), sorted
   by q. `all_motifs=True` returns every scored motif, called or not, with all
@@ -48,7 +52,7 @@ series = calculate_log2fc(counts, reference_column="MFDpir")["JJ1886_T0"]
 _fixed, flex = find_restricted_motifs_mp(series, left, right, cpu_count=16,
                                          flexible_motif_log2fc_thr=-1, flexible_motif_score_thr=0.7)
 # after
-from randseq.core import find_restricted_motifs, TooManyCandidatesError
+from randseq import calculate_log2fc, find_restricted_motifs, TooManyCandidatesError
 series = calculate_log2fc(counts, reference_column="MFDpir")["JJ1886_T0"]   # median-normalised
 motifs = find_restricted_motifs(series, left, right, n_jobs=16,
                                 log2fc_thr=-1, score_thr=0.7)                # the calls

@@ -26,10 +26,7 @@ counted in the donor (two replicates, `Control_R1` and `Control_R2`) and in 8 re
 two replicates each; `counts_panel_key.csv` says what each strain shows.
 
 ``` python
-from randseq.core import find_restricted_motifs
-from randseq.utils import calculate_log2fc
-from randseq.plotting import plot_motif_analysis
-from randseq.example_data import get_example_data_dir
+from randseq import calculate_log2fc, find_restricted_motifs, plot_motif_analysis, get_example_data_dir
 import pandas as pd
 ```
 
@@ -119,11 +116,11 @@ motifs_all[["motif", "num_sequences", "fraction_depleted_lower", "background", "
     }
 </style>
 
-|  | motif | num_sequences | fraction_depleted_lower | background | q_value | merged_from | reason |
-|----|----|----|----|----|----|----|----|
-| 0 | AAAGNNNNGTT | 913 | 0.993120 | 0.131871 | 0.000000e+00 |  | called |
-| 1 | RTACNNNNGTG | 963 | 0.996894 | 0.130708 | 0.000000e+00 | ATACNNNNGTG+CACNNNNGTAC | called |
-| 2 | GGTCTC | 55 | 0.916629 | 0.129596 | 2.999895e-43 |  | called |
+|     | motif       | num_sequences | fraction_depleted_lower | background | q_value      | merged_from             | reason |
+|-----|-------------|---------------|-------------------------|------------|--------------|-------------------------|--------|
+| 0   | AAAGNNNNGTT | 913           | 0.993120                | 0.131871   | 0.000000e+00 |                         | called |
+| 1   | RTACNNNNGTG | 963           | 0.996894                | 0.130708   | 0.000000e+00 | ATACNNNNGTG+CACNNNNGTAC | called |
+| 2   | GGTCTC      | 55            | 0.916629                | 0.129596   | 2.999895e-43 |                         | called |
 
 </div>
 

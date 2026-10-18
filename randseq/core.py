@@ -1098,8 +1098,9 @@ def find_restricted_motifs(log2fc_series,
             screened with the same library and flanks share it, so a panel encodes it once.
             It must describe exactly `log2fc_series.index`, in order.
         center (bool): subtract the series' median before anything is thresholded. The
-            typical untouched plasmid sits below log2FC 0, the more so the noisier the sample, so
-            without centring the same threshold would be a different stringency in every strain.
+            typical untouched plasmid sits below log2FC 0 when a few plasmids take a large share of
+            the reads, so without centring the same threshold would be a different stringency in
+            every strain.
             `avg_log2fc` is then relative to the sample's own typical plasmid.
         all_motifs (bool): return every scored motif, called or not, with every column.
 

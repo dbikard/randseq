@@ -20,7 +20,7 @@ from tqdm import tqdm
 from .coding import encode_library, _encode_motif, _motif_presence_matrix, _pattern_is_self_rc, _rc_code_table
 from .fast import _scan_pattern, _scores_from_totals
 from .utils import (_IUPAC_COLLAPSE, _IUPAC_EXPAND, revcomp, calculate_log2fc, get_lib_seq_context,
-                           get_patterns, _canonical_pattern, _find_broad_in_specific, _get_filter_for_motif,
+                           get_patterns, _canonical_pattern, _get_filter_for_motif,
                            canonical_motif, plasmid_background, _motif_pvalues, _benjamini_hochberg)
 
 # %% ../nbs/00_core.ipynb #0b75ece4
@@ -178,19 +178,6 @@ def _is_mixture(motif, pattern, encoded_library, fc_values, background, log2fc_t
             return True
     return False
 
-# %% ../nbs/00_core.ipynb #7b72c066
-def _is_extension(specific, general):
-    """Is `specific` the motif `general` with one more defined base, on either strand?
-
-    The extra base sits one past an end of `general` or at an edge of its spacer -- the
-    positions `_undefined_positions` tests. Both strands are checked because every pattern is
-    searched in one canonical form, so adding a base to a motif's longer side can turn its shape
-    into the mirror form, which the scan writes on the other strand: `TACNNNNGTGA` is
-    `CACNNNNGTA` with a base added on the left.
-    """
-    defined = lambda m: len(m) - m.count("N")
-    return defined(specific) == defined(general) + 1 and _find_broad_in_specific(specific, general)
-
 # %% ../nbs/00_core.ipynb #c910b1f7
 def _motif_shape(motif):
     """`(trimmed motif, pattern)`, or None when the string is not a `(d1, spacer, d2)` motif.
@@ -214,8 +201,8 @@ def _parent_motifs(motif, pattern):
 
     The inverse of `_undefined_positions`: the base it adds sits at an end or at a spacer edge,
     so giving up one of those four bases recovers the motif it extends. Checking these against
-    the candidates is the same question as `_is_extension` against every shorter candidate, at a
-    handful of lookups instead of a comparison per pair.
+    the candidates is the same question as asking, of every shorter candidate, whether this motif
+    extends it -- at a handful of lookups instead of a comparison per pair.
 
     Returns the motif strings, without their patterns -- a caller matching against a set of
     candidate strings does not need them.
@@ -411,8 +398,8 @@ def _filter_redundant_patterns(df, log2fc_series, left_context, right_context,
     1. **A mixture is not a site.** A candidate is dropped when fixing one position next to it
        splits the plasmids that carry it into depleting and not (`_is_mixture`).
     2. **A one-base extension of a site is redundant.** A candidate is dropped when it is a
-       candidate that survived rule 1 with one more defined base (`_is_extension`, applied by
-       looking up `_parent_motifs`): rule 1 found that site's neighbouring positions carry
+       candidate that survived rule 1 with one more defined base (found by looking up
+       `_parent_motifs`): rule 1 found that site's neighbouring positions carry
        nothing, so pinning one adds nothing.
     3. **A motif with an uninformative base is not the site.** A candidate is dropped when, at one
        of its defined bases, every other base behaves like the site (`_is_over_specified`).

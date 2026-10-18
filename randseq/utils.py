@@ -221,66 +221,6 @@ def _custom_motif_to_regex(motif):
     return "".join(_IUPAC_DNA_TO_REGEX[c] for c in normalise_motif(motif))
 
 
-# %% ../nbs/01_utils.ipynb #16da8b97
-def _check_specific_matches_broad(specific, broad):
-  """
-  Whether `specific` matches `broad` position by position, `N` in `broad` matching anything.
-
-  Both strings must be the same length. An `N` in `specific` has no special meaning: it only
-  matches an `N` in `broad`.
-
-  Args:
-    specific: The string that is being checked.
-    broad: The string that contains the pattern, where 'N' is a wildcard.
-
-  Returns:
-    True if the 'specific' string matches the 'broad' pattern, False otherwise.
-  """
-  if len(specific) != len(broad):
-    return False
-
-  for spec_char, broad_char in zip(specific, broad):
-    if spec_char == broad_char or broad_char == 'N':
-      continue
-    return False
-  return True
-
-def _find_broad_in_specific(specific, broad):
-  """
-  Whether `broad`, or its reverse complement, occurs anywhere in `specific`.
-
-  Each window of `specific` the length of `broad` is compared with
-  `_check_specific_matches_broad` (`N` in `broad` is a wildcard), forward first, then against
-  `revcomp(broad)`. A `broad` longer than `specific` is never found; an empty one always is.
-
-  Args:
-    specific: the motif (or sequence) searched in.
-    broad: the motif searched for.
-
-  Returns:
-    True if 'broad' or its reverse complement is found in 'specific', False otherwise.
-  """
-  if len(specific) < len(broad):
-    return False
-
-  broad_len = len(broad)
-  if broad_len == 0:
-      return True
-
-  # 1. Check the forward orientation
-  is_forward_match = any(_check_specific_matches_broad(specific[i:i + broad_len], broad)
-                         for i in range(len(specific) - broad_len + 1))
-
-  if is_forward_match:
-    return True
-
-  # 2. If no forward match, check the reverse complement orientation
-  broad_rev_comp = revcomp(broad)
-  is_reverse_match = any(_check_specific_matches_broad(specific[i:i + broad_len], broad_rev_comp)
-                         for i in range(len(specific) - broad_len + 1))
-
-  return is_reverse_match
-
 # %% ../nbs/01_utils.ipynb #4672972a
 def _canonical_pattern(pattern):
     """The single form of `pattern` the scan uses.

@@ -19,7 +19,7 @@ import sys
 import pandas as pd
 import pytest
 
-from randseq.core import calculate_log2fc, find_restricted_motifs, get_patterns
+from randseq.core import call_reason, calculate_log2fc, find_restricted_motifs, get_patterns
 from randseq.example_data import get_example_data_dir
 
 TOL = 1e-6
@@ -74,7 +74,10 @@ PANEL = dict(
 )
 
 
-def run_case(cfg):
+COMPACT = ["motif", "num_sequences", "fraction_depleted", "excess_depleted", "avg_log2fc", "q_value"]
+
+
+def run_case(cfg, **kwargs):
     path = os.path.join(get_example_data_dir(), cfg["file"])
     df = pd.read_csv(path).set_index(cfg["seq_col"])
     log2fc = calculate_log2fc(
@@ -86,31 +89,68 @@ def run_case(cfg):
         cfg["right"],
         flexible_motif_patterns=cfg["patterns"] or get_patterns(),
         flexible_motif_score_thr=cfg["score_thr"],
+        **kwargs,
     )
 
 
 @pytest.mark.parametrize("cfg,name", [(JJ1886, "JJ1886"), (PANEL, "panel")])
 def test_reference_motifs(cfg, name):
-    flex = run_case(cfg)
+    motifs = run_case(cfg)
 
-    # Rows below the significance threshold are returned on purpose, flagged rather than
-    # dropped, so the contract is about what is *called*.
-    called = flex[flex["called"]]
-    assert set(called["motif"]) == set(cfg["expected"]), (
+    # The default return is the called motifs alone, in six columns, sorted by q.
+    assert list(motifs.columns) == COMPACT
+    assert motifs["q_value"].is_monotonic_increasing
+    assert set(motifs["motif"]) == set(cfg["expected"]), (
         f"{name}: called motif set changed.\n"
         f"  expected {sorted(cfg['expected'])}\n"
-        f"  got      {sorted(called['motif'])}\n"
-        f"  (also reported, not called: "
-        f"{sorted(set(flex['motif']) - set(called['motif']))})"
+        f"  got      {sorted(motifs['motif'])}"
     )
-
-    for _, row in called.iterrows():
+    for _, row in motifs.iterrows():
         frac, n, fc = cfg["expected"][row["motif"]]
         assert row["num_sequences"] == n, f"{name}/{row['motif']}: num_sequences"
         assert abs(row["fraction_depleted"] - frac) < TOL, f"{name}/{row['motif']}: fraction_depleted"
         assert abs(row["avg_log2fc"] - fc) < TOL, f"{name}/{row['motif']}: avg_log2fc"
+
+    # all_motifs=True: the same calls, first, with every column and a reason for each row.
+    full = run_case(cfg, all_motifs=True)
+    called = full[full["called"]]
+    assert list(full["called"]) == sorted(full["called"], reverse=True)
+    pd.testing.assert_frame_equal(called[COMPACT].sort_values(["q_value", "motif"])
+                                  .reset_index(drop=True), motifs)
+    assert set(called["reason"]) == {"called"}
+    assert not full.loc[~full["called"], "reason"].str.startswith("called").any()
+    for _, row in called.iterrows():
         assert row["merged_from"] == cfg["merged"].get(row["motif"], ""), \
             f"{name}/{row['motif']}: merged_from"
+
+
+def test_reason_of_uncalled_motif():
+    """At the defaults, the 20 nt JJ1886 run scores GTCGNNNNNNNCGGA as significant (q = 1.2e-3)
+    but with only 7 of 12 carriers depleted: the bound on the depleted fraction fails it."""
+    path = os.path.join(get_example_data_dir(), JJ1886["file"])
+    df = pd.read_csv(path).set_index("seq")
+    log2fc = calculate_log2fc(df[["MFDpir", "JJ1886_T0"]], reference_column="MFDpir",
+                              count_threshold=20)["JJ1886_T0"]
+    full = find_restricted_motifs(log2fc, JJ1886["left"], JJ1886["right"],
+                                  all_motifs=True).set_index("motif")
+    assert full.loc["GTCGNNNNNNNCGGA", "reason"] == \
+        "most carriers not shown depleted (7/12; lower bound 0.32 < 0.5)"
+
+
+def test_call_reason():
+    """Each verdict in words: called, not significant, bound failed, both, bimodal note."""
+    row = pd.Series({"num_sequences": 10, "fraction_depleted": 0.9, "q_value": 1e-6,
+                     "fraction_depleted_lower": 0.6, "bimodal": False})
+    assert call_reason(row) == "called"
+    late = row.copy(); late["q_value"] = 0.21
+    assert call_reason(late) == "not significant (q = 0.21)"
+    weak = row.copy(); weak["fraction_depleted"], weak["fraction_depleted_lower"] = 0.5, 0.22
+    assert call_reason(weak) == "most carriers not shown depleted (5/10; lower bound 0.22 < 0.5)"
+    weak["q_value"] = 0.3
+    assert call_reason(weak) == ("not significant (q = 0.3); "
+                                 "most carriers not shown depleted (5/10; lower bound 0.22 < 0.5)")
+    row["bimodal"] = True
+    assert call_reason(row) == "called; carriers split between depleted and untouched"
 
 
 def test_both_datasets_agree_on_motifs():
@@ -143,11 +183,11 @@ def test_deterministic_across_hash_seeds():
         "from randseq.example_data import get_example_data_dir\n"
         "df = pd.read_csv(os.path.join(get_example_data_dir(), 'countsTable.csv.gz')).set_index('seq')\n"
         "l = calculate_log2fc(df[['MFDpir','JJ1886_T0']], reference_column='MFDpir')['JJ1886_T0']\n"
-        "flex = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
+        "m = find_restricted_motifs(l, 'GTCCTAGGTATAATACTAGT', 'GTTTTAGAGCTAGAAATAGC',\n"
         "    flexible_motif_patterns=[(6,0,0),(7,0,0),(4,2,4),(4,4,3),(4,3,4),(4,4,4)],\n"
-        "    flexible_motif_score_thr=0.7)\n"
+        "    flexible_motif_score_thr=0.7, all_motifs=True)\n"
         "rows = sorted((r['motif'], int(r['num_sequences']), round(float(r['avg_log2fc']), 6),\n"
-        "               bool(r['called'])) for _, r in flex.iterrows())\n"
+        "               bool(r['called'])) for _, r in m.iterrows())\n"
         "print('RESULT', rows)\n"
     )
     results = {}

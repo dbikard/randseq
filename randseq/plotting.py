@@ -16,7 +16,7 @@ import os
 from .utils import calculate_log2fc, get_motif_filter_with_context, get_custom_motif_presence_in_library
 
 # %% ../nbs/02_plotting.ipynb #8d97e736
-def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
+def plot_motif_analysis(counts_df, sample_col, ref_col, motifs,
                         left_context, right_context,
                         title_main=None,
                         pseudocount=1,
@@ -35,10 +35,10 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
     if not isinstance(counts_df, pd.DataFrame) or counts_df.empty: return None, None
     if not all(col in counts_df.columns for col in [sample_col, ref_col]): return None, None
     
-    if flexible_motifs_df is None: flexible_motifs_df = pd.DataFrame(columns=['motif'])
-    elif not isinstance(flexible_motifs_df, pd.DataFrame): return None, None
-    if not flexible_motifs_df.empty and 'motif' not in flexible_motifs_df.columns:
-        flexible_motifs_df = pd.DataFrame(columns=['motif'])
+    if motifs is None: motifs = pd.DataFrame(columns=['motif'])
+    elif not isinstance(motifs, pd.DataFrame): return None, None
+    if not motifs.empty and 'motif' not in motifs.columns:
+        motifs = pd.DataFrame(columns=['motif'])
 
     # Auto-generate title_main if it's None
     if title_main is None:
@@ -46,8 +46,8 @@ def plot_motif_analysis(counts_df, sample_col, ref_col, flexible_motifs_df,
 
     # --- Define Color Palette ---
     unique_plot_motifs = []
-    if 'motif' in flexible_motifs_df.columns and not flexible_motifs_df.empty:
-        unique_plot_motifs = flexible_motifs_df['motif'].dropna().unique().tolist()
+    if 'motif' in motifs.columns and not motifs.empty:
+        unique_plot_motifs = motifs['motif'].dropna().unique().tolist()
 
     color_map = {'All Sequences': 'grey'} 
     palette_name = "tab10" 

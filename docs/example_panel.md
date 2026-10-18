@@ -7,7 +7,8 @@ this page records what each one does so the walkthrough's claims can be checked.
 Measured 2026-10-17 (merged motifs 2026-10-18) at the pipeline's defaults: log2FC of replicate R1 against `Control_R1`
 (`calculate_log2fc`, `count_threshold=20`, 30,108 plasmids kept), then
 `find_restricted_motifs(series, left, right)` — `get_patterns()`, centred, depleted below −0.5,
-score 0.5. "Called" means q < 0.05.
+score 0.5. The motifs called are the rows it returns; the motifs scored but not called come back
+with `all_motifs=True`.
 
 | strain | motifs called | candidates entering step 4 |
 |---|---|---|
@@ -44,7 +45,7 @@ any other. Both sites are called as two variants each and reported as `GACNNNNGT
 **381A** — a noisy sample: the largest step-4 input of the panel, and a third of its library
 depleted for reasons unrelated to any site. Only the real `CCTNAGG` is called; two weak motifs
 (about half their carriers depleted) are tested against their carriers' GC-matched background and
-stay uncalled.
+stay uncalled; `all_motifs=True` lists them with the reason.
 
 **EDL933 and EDL933_dRM** — specificity, demonstrated isogenically. The wild type yields
 `CACNNNNNNNCTGG`; its RM knockout yields nothing. A negative result from an unrelated strain

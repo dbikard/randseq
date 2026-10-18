@@ -70,7 +70,7 @@ for recipient in recipients:
     series = table[recipient].dropna()
     print(f"\n### {recipient}: {len(series)} plasmids", flush=True, file=sys.stderr)
     try:
-        flex = find_restricted_motifs(
+        motifs = find_restricted_motifs(
             series, left, right,
             flexible_motif_patterns=get_patterns(),
             flexible_motif_log2fc_thr=l2fc_thr,
@@ -87,18 +87,18 @@ for recipient in recipients:
         skipped.append(dict(sample=recipient, reason=f"{type(e).__name__}: {e}"))
         continue
 
-    if flex is None or flex.empty:
+    if motifs.empty:
         print("  no motif called", file=sys.stderr)
         continue
 
-    for _, r in flex.iterrows():
+    for _, r in motifs.iterrows():
         motif = r["motif"]
         mask = _get_filter_for_motif(series, motif, left, right)
         m_plus = series[mask]
         rows.append(dict(
             sample=recipient,
             motif=motif,
-            pattern=r["pattern"],
+            q_value=float(r["q_value"]),
             median_log2fc=round(float(m_plus.median()), 4),
             mean_log2fc=round(float(r["avg_log2fc"]), 4),
             escaper_rate=round(float((m_plus > ESCAPER_THR).mean()), 4),

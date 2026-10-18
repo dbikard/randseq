@@ -10,7 +10,7 @@ __all__ = ['LR_THRESHOLD', 'BIMODALITY_BENCHMARK', 'motif_occurrences', 'scan_pa
            'parent_motifs', 'relax_positions', 'site_or_background', 'classify_bases', 'classify_positions',
            'is_over_specified', 'motif_instances', 'filter_redundant_patterns', 'filter_explained_candidates',
            'bimodality_coefficient', 'upper_group_median', 'annotate_significance', 'generalise_motif',
-           'merge_degenerate_calls', 'TooManyCandidatesError', 'find_restricted_motifs']
+           'merge_degenerate_calls', 'call_reason', 'TooManyCandidatesError', 'find_restricted_motifs']
 
 # %% ../nbs/00_core.ipynb #ef76c820
 import ast
@@ -803,14 +803,15 @@ def annotate_significance(results_df, log2fc_series, left_context, right_context
 
     Nothing is removed. `called` marks the rows whose q-value is below `q_threshold` and whose
     `fraction_depleted_lower` reaches `score_thr`; the rest stay in the table so that a weak
-    result is visible as a weak claim rather than silently absent.
+    result is visible as a weak claim rather than silently absent (`find_restricted_motifs`
+    returns them with `all_motifs=True`).
     """
     if results_df is None:
         return results_df
     if results_df.empty:
         # A strain with no active system is the first thing a new user runs, so the empty
-        # table must have the same columns as a full one -- otherwise `flex[flex.called]`
-        # works on every strain that finds something and raises on the ones that do not.
+        # table must have the same columns as a full one -- otherwise selecting the called
+        # rows works on every strain that finds something and raises on the ones that do not.
         out = results_df.copy()
         for _c, _dt in (("fraction_depleted_lower", float), ("background", float),
                         ("excess_depleted", float), ("p_value", float),
@@ -985,6 +986,44 @@ def merge_degenerate_calls(table, log2fc_series, left_context, right_context, en
     out = pd.concat([table[~dropped], scored[table.columns]], ignore_index=True)
     return out.sort_values(["called", "q_value"], ascending=[False, True], kind="stable")
 
+# %% ../nbs/00_core.ipynb #66eeb538
+def call_reason(row, q_threshold=0.05, score_thr=0.5):
+    """Why a row of the result table is called or not, in a few words.
+
+    A call needs q below `q_threshold` and the lower bound on the depleted fraction at `score_thr`
+    or above (`annotate_significance`). The reason names each test the row fails, with its numbers,
+    or says "called"; a called row with bimodal carriers adds a note, since bimodality does not
+    block a call.
+    """
+    n = int(row["num_sequences"])
+    failed = []
+    if not row["q_value"] < q_threshold:
+        failed.append(f"not significant (q = {row['q_value']:.2g})")
+    if not row["fraction_depleted_lower"] >= score_thr:
+        failed.append(f"most carriers not shown depleted ({round(row['fraction_depleted'] * n)}/{n}; "
+                      f"lower bound {row['fraction_depleted_lower']:.2f} < {score_thr:g})")
+    if failed:
+        return "; ".join(failed)
+    return "called; carriers split between depleted and untouched" if row["bimodal"] else "called"
+
+
+_COMPACT_COLUMNS = ["motif", "num_sequences", "fraction_depleted", "excess_depleted", "avg_log2fc",
+                    "q_value"]
+_FULL_COLUMNS = _COMPACT_COLUMNS + ["pattern", "fraction_depleted_lower", "background", "p_value",
+                                    "called", "bimodality", "bimodal", "merged_from"]
+
+
+def _result_view(table, all_motifs, q_threshold, score_thr):
+    """What `find_restricted_motifs` returns: the called rows in six columns, or every row with
+    its `reason`, called first."""
+    if not all_motifs:
+        return (table.loc[table["called"], _COMPACT_COLUMNS]
+                .sort_values(["q_value", "motif"]).reset_index(drop=True))
+    reason = [call_reason(r, q_threshold, score_thr) for _, r in table.iterrows()]
+    return (table[_FULL_COLUMNS].assign(reason=pd.Series(reason, index=table.index, dtype=object))
+            .sort_values(["called", "q_value", "motif"], ascending=[False, True, True])
+            .reset_index(drop=True))
+
 # %% ../nbs/00_core.ipynb #3bfb4529
 class TooManyCandidatesError(RuntimeError):
     """Raised when step 3 leaves more candidates than step 4 will compare.
@@ -1021,7 +1060,8 @@ def find_restricted_motifs(log2fc_series,
                            max_candidates=5000,
                            q_threshold=0.05,
                            encoded_library=None,
-                           center=True
+                           center=True,
+                           all_motifs=False
                            ):
     """The motifs one sample restricts: steps 2 to 4 and reporting on a log2FC series.
 
@@ -1046,9 +1086,11 @@ def find_restricted_motifs(log2fc_series,
         flexible_motif_log2fc_thr (float): a plasmid counts as depleted below this, after
             centring. Default -0.5: low enough to see weakly restricting systems such as BREX,
             which a -1 threshold misses.
-        flexible_motif_min_support (int): minimum plasmids for a motif to be considered. The
-            default of 5 was set by a permutation test on the smaller example library: motifs
-            with 3-4 supporting plasmids arose by chance about once per scan, none at 5 or above.
+        flexible_motif_min_support (int): minimum plasmids for a motif to be considered. With
+            every carrier depleted, the lower bound on the depleted fraction is 0.22, 0.37, 0.47
+            and 0.55 for 2 to 5 carriers, so 5 is the smallest support that can be called at the
+            default score threshold of 0.5 (4 at 0.45, 7 at 0.65). Lower only adds candidates and
+            runtime: E1114 on the 20 nt library exceeds `max_candidates` at 2 to 4.
         flexible_motif_score_thr (float): at least this fraction of the plasmids carrying a
             candidate must be depleted, and a call must show it with confidence (the lower bound
             `fraction_depleted_lower` reaches it). Default 0.5, the value the draft's Fig 3 uses.
@@ -1058,7 +1100,7 @@ def find_restricted_motifs(log2fc_series,
             example data and the BB2 panel brings at the default thresholds.
         q_threshold (float): a motif is marked `called` when its Benjamini-Hochberg q-value,
             computed against its carriers' GC-matched background and over every motif the scan
-            tested, falls below this. Motifs that miss it are still returned.
+            tested, falls below this.
         encoded_library (tuple): `encode_library(get_lib_seq_context(log2fc_series.index,
             left_context_str, right_context_str))`, if the caller already has it. Strains
             screened with the same library and flanks share it, so a panel encodes it once.
@@ -1066,11 +1108,13 @@ def find_restricted_motifs(log2fc_series,
         center (bool): subtract the series' median before anything is thresholded, so that a
             sample shifted as a whole is held to the same stringency as any other.
             `avg_log2fc` is then relative to the sample's own typical plasmid.
+        all_motifs (bool): return every scored motif, called or not, with every column.
 
     Returns:
-        pd.DataFrame: one row per reported motif -- 'motif', 'fraction_depleted',
-        'num_sequences', 'avg_log2fc', 'pattern', the columns `annotate_significance` adds, and
-        'merged_from' -- called rows first.
+        pd.DataFrame: by default the called motifs, one row each, sorted by q: 'motif',
+        'num_sequences', 'fraction_depleted', 'excess_depleted', 'avg_log2fc', 'q_value'. With
+        `all_motifs=True`, every scored motif, called rows first: those columns, 'pattern', the
+        others `annotate_significance` adds, 'merged_from', and 'reason' (`call_reason`).
     """
     if center:
         log2fc_series = log2fc_series - log2fc_series.median()
@@ -1078,10 +1122,12 @@ def find_restricted_motifs(log2fc_series,
                                        'avg_log2fc', 'pattern'])
     report = functools.partial(annotate_significance, log2fc_thr=flexible_motif_log2fc_thr,
                                q_threshold=q_threshold, score_thr=flexible_motif_score_thr)
+    view = functools.partial(_result_view, all_motifs=all_motifs, q_threshold=q_threshold,
+                             score_thr=flexible_motif_score_thr)
     if log2fc_series.empty:
         print("The input series is empty; there is nothing to scan.")
-        return report(candidates, log2fc_series, left_context_str, right_context_str,
-                      all_pvalues=np.array([])).assign(merged_from="")
+        return view(report(candidates, log2fc_series, left_context_str, right_context_str,
+                           all_pvalues=np.array([])).assign(merged_from=""))
 
     # The library is encoded once and every step below reads it.
     if encoded_library is None:
@@ -1164,7 +1210,7 @@ def find_restricted_motifs(log2fc_series,
 
     # Canonicalise before printing, so the names in the log are the names in the table.
     candidates = _canonicalise_flexible_motifs(candidates)
-    print(f"{len(candidates)} motif(s) reported.")
+    print(f"{len(candidates)} motif(s) scored:")
     for _, row in candidates.iterrows():
         print(f"  {row['motif']} (pattern {row['pattern']}), FracDep: {row['fraction_depleted']:.2f}, "
               f"AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
@@ -1181,4 +1227,5 @@ def find_restricted_motifs(log2fc_series,
         print(f"{len(merged)} degenerate site(s) reported as one motif:")
         for m, parts in zip(merged["motif"], merged["merged_from"]):
             print(f"  {m} <- {parts.replace('+', ' + ')}")
-    return table
+    print(f"{int(table['called'].sum())} motif(s) called.")
+    return view(table)

@@ -89,45 +89,11 @@ fig, axes = plot_motif_analysis(counts, "JJ1886_R1", "Control_R1", motifs, left,
 
 ![](index_files/figure-commonmark/cell-6-output-1.png)
 
-`all_motifs=True` returns every motif that was scored, called or not, with the diagnostic columns
-and a `reason` for each verdict. On JJ1886 every scored motif is called. `merged_from` names the
-two variants the Type I site was merged from, and `background`, about 0.13 here, is the rate at
-which plasmids like the carriers deplete anyway:
-
-``` python
-motifs_all = find_restricted_motifs(log2fc_df["JJ1886_R1"], left, right, all_motifs=True)
-```
-
-``` python
-motifs_all[["motif", "num_sequences", "fraction_depleted_lower", "background", "q_value",
-            "merged_from", "reason"]]
-```
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-&#10;    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-&#10;    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-
-|     | motif       | num_sequences | fraction_depleted_lower | background | q_value      | merged_from             | reason |
-|-----|-------------|---------------|-------------------------|------------|--------------|-------------------------|--------|
-| 0   | AAAGNNNNGTT | 913           | 0.993120                | 0.131871   | 0.000000e+00 |                         | called |
-| 1   | RTACNNNNGTG | 963           | 0.996894                | 0.130708   | 0.000000e+00 | ATACNNNNGTG+CACNNNNGTAC | called |
-| 2   | GGTCTC      | 55            | 0.916629                | 0.129596   | 2.999895e-43 |                         | called |
-
-</div>
-
-When a scored motif is not called, `reason` names each test it failed, with its numbers.
+`all_motifs=True` also returns the motifs that were scored but not called, with diagnostic columns
+and the reason for each verdict.
 [Reading the result table](https://dbikard.github.io/randseq/core.html#reading-the-result-table)
-in the core documentation explains each column, and *The example panel at a glance* there runs
-every strain of the panel.
+in the core documentation explains them, and *The example panel at a glance* there runs every
+strain of the panel.
 
 ## Documentation
 

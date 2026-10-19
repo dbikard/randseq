@@ -6,7 +6,7 @@ Modules:
 - `randseq.fast`: Scoring one pattern: its totals from an optional compiled kernel or from the numpy path, and the scores reported from them.
 - `randseq.utils`: The helpers `core` is built from: fold changes, motif strings and strands, the search space, custom-motif lookups and significance; and helpers for analysis scripts."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .utils import calculate_log2fc, get_patterns
 from .core import find_restricted_motifs, TooManyCandidatesError

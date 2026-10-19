@@ -35,6 +35,8 @@ version = {attr = "randseq.__version__"}
 include = ["randseq*"]
 
 [tool.nbdev]
+# show_doc layout for the docs: summary, signature, parameter table (randseq/_docs_renderer.py)
+renderer = "randseq._docs_renderer.DocsRenderer"
 
 [tool.pytest.ini_options]
 markers = ["slow: reruns the pipeline in subprocesses (determinism check)"]

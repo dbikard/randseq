@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "randseq"
 dynamic = ["version"]
-description = "inferring restricted motifs using the  RandSeq method"
+description = "Infer the DNA motifs bacterial defence systems restrict, from RandSeq random-insert plasmid libraries"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{name = "dbikard", email = "dbikard@gmail.com"}]
-keywords = ['nbdev', 'jupyter', 'notebook', 'python']
-classifiers = ["Natural Language :: English", "Intended Audience :: Developers", "Development Status :: 3 - Alpha", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only"]
+keywords = ['restriction-modification', 'restriction site', 'defence systems', 'motif discovery', 'RandSeq', 'bacteria']
+classifiers = ["Natural Language :: English", "Intended Audience :: Science/Research", "Topic :: Scientific/Engineering :: Bio-Informatics", "Development Status :: 4 - Beta", "Programming Language :: Python :: 3", "Programming Language :: Python :: 3 :: Only", "Operating System :: OS Independent"]
 dependencies = ['fastcore', 'pandas', 'numpy', 'scipy', 'matplotlib', 'seaborn', 'tqdm', 'plotnine']
 
 [project.optional-dependencies]
@@ -22,6 +22,8 @@ fast = ['numba>=0.60']
 [project.urls]
 Repository = "https://github.com/dbikard/randseq"
 Documentation = "https://dbikard.github.io/randseq"
+Changelog = "https://github.com/dbikard/randseq/blob/main/CHANGELOG.md"
+Issues = "https://github.com/dbikard/randseq/issues"
 
 [project.entry-points.nbdev]
 randseq = "randseq._modidx:d"

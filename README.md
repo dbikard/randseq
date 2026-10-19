@@ -5,16 +5,20 @@
 
 ## Installation
 
-Install latest from the GitHub [repository](https://github.com/dbikard/randseq):
-
 ``` sh
-$ pip install git+https://github.com/dbikard/randseq.git
+$ pip install randseq
 ```
 
 Optionally, with a compiled scan that is about 13x faster on 8 cores and gives identical results:
 
 ``` sh
-$ pip install "randseq[fast] @ git+https://github.com/dbikard/randseq.git"
+$ pip install "randseq[fast]"
+```
+
+The development version installs from the GitHub [repository](https://github.com/dbikard/randseq):
+
+``` sh
+$ pip install git+https://github.com/dbikard/randseq.git
 ```
 
 ## Usage
@@ -97,21 +101,6 @@ strain of the panel.
 
 ## Documentation
 
-Documentation can be found hosted on this GitHub [repository](https://github.com/dbikard/randseq)’s [pages](https://dbikard.github.io/randseq/). Additionally you can find package manager specific guidelines on [conda](https://anaconda.org/dbikard/randseq) and [pypi](https://pypi.org/project/randseq/) respectively.
-
-## Developer Guide
-
-If you are new to using `nbdev` here are some useful pointers to get you started.
-
-### Install randseq in Development mode
-
-``` sh
-# make sure randseq package is installed in development mode
-$ pip install -e .
-
-# make changes under nbs/ directory
-# ...
-
-# compile to have changes apply to randseq
-$ nbdev-prepare
-```
+The documentation is at [dbikard.github.io/randseq](https://dbikard.github.io/randseq/): one page per
+module, each a walkthrough of the code with examples. The changes between versions are in
+[CHANGELOG.md](https://github.com/dbikard/randseq/blob/main/CHANGELOG.md).

@@ -73,12 +73,20 @@ motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
   on the plasmids no stronger candidate explains, held to the scan's own cutoff (step 4).
 - A degenerate site is reported as one IUPAC motif (e.g. `RTACNNNNGTG` rather than two variant
   rows); `merged_from` lists the rows it replaced.
+- A candidate that needs the vector flanks on more than half its carriers must stand on its
+  carriers with a site wholly inside the insert (at least `min_support`, lower bound at
+  `score_thr`, p < `q_threshold`), or it is not called. The check runs between steps 3 and 4, so
+  such a candidate cannot explain others away; it removes flank-completed motifs such as
+  `DCAANNNNNNTAGA` in TA249 and ROAR8 (20 nt example library).
 
 ### New columns
 
 `background` (the carriers' GC-matched depletion rate), `fraction_depleted_lower`, `p_value`,
 `q_value`, `called`, `bimodality`, `bimodal` (carriers split between destroyed and untouched),
 `merged_from`, `reason`. All but `q_value` are in the `all_motifs=True` table only.
+`junction_share`, `internal_n`, `internal_fraction_lower` and `internal_p_value` (the share of
+carriers that need the flanks, and the test of the others) are in it too; `call_reason` takes
+`min_support` for that test.
 
 ### Other
 

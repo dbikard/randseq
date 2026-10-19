@@ -126,21 +126,28 @@ def test_reference_motifs(cfg, name):
 
 def test_reason_of_uncalled_motif():
     """At the defaults, the 20 nt JJ1886 run scores GTCGNNNNNNNCGGA as significant (q = 1.2e-3)
-    but with only 7 of 12 carriers depleted: the bound on the depleted fraction fails it."""
+    but with only 7 of 12 carriers depleted: the bound on the depleted fraction fails it.
+
+    Since the junction rule (2026-10-19) it also fails that: 8 of its 12 carriers need the flank,
+    and 1 of its 4 internal carriers is depleted. Both reasons are given."""
     path = os.path.join(get_example_data_dir(), JJ1886["file"])
     df = pd.read_csv(path).set_index("seq")
     log2fc = calculate_log2fc(df[["MFDpir", "JJ1886_T0"]], reference_column="MFDpir",
                               count_threshold=20)["JJ1886_T0"]
     full = find_restricted_motifs(log2fc, JJ1886["left"], JJ1886["right"],
                                   all_motifs=True).set_index("motif")
-    assert full.loc["GTCGNNNNNNNCGGA", "reason"] == \
-        "most carriers not shown depleted (7/12; lower bound 0.32 < 0.5)"
+    assert full.loc["GTCGNNNNNNNCGGA", "reason"] == (
+        "most carriers not shown depleted (7/12; lower bound 0.32 < 0.5); "
+        "junction-dependent: 67% of carriers need the flank, and its internal sites do not reach "
+        "the bar (n = 4, lower bound 0.01, p = 0.23)")
 
 
 def test_call_reason():
-    """Each verdict in words: called, not significant, bound failed, both, bimodal note."""
+    """Each verdict in words: called, not significant, bound failed, both, bimodal note, and a
+    motif that needs the flank without enough internal sites."""
     row = pd.Series({"num_sequences": 10, "fraction_depleted": 0.9, "q_value": 1e-6,
-                     "fraction_depleted_lower": 0.6, "bimodal": False})
+                     "fraction_depleted_lower": 0.6, "bimodal": False, "junction_share": 0.2,
+                     "internal_n": 8, "internal_fraction_lower": 0.5, "internal_p_value": 1e-5})
     assert call_reason(row) == "called"
     late = row.copy(); late["q_value"] = 0.21
     assert call_reason(late) == "not significant (q = 0.21)"
@@ -149,6 +156,10 @@ def test_call_reason():
     weak["q_value"] = 0.3
     assert call_reason(weak) == ("not significant (q = 0.3); "
                                  "most carriers not shown depleted (5/10; lower bound 0.22 < 0.5)")
+    flank = row.copy(); flank["junction_share"], flank["internal_n"] = 0.9, 2
+    assert call_reason(flank) == ("junction-dependent: 90% of carriers need the flank, and its "
+                                  "internal sites do not reach the bar (n = 2, lower bound 0.50, "
+                                  "p = 1e-05)")
     row["bimodal"] = True
     assert call_reason(row) == "called; carriers split between depleted and untouched"
 

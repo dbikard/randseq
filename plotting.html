@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="visualizing the results">
+
+<title>Plotting – randseq</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-f2788e636de456f6409e966386820849.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="Plotting – randseq">
+<meta property="og:description" content="visualizing the results">
+<meta property="og:image" content="https://dbikard.github.io/randseq/02_plotting_files/figure-html/cell-6-output-1.png">
+<meta property="og:site_name" content="randseq">
+<meta property="og:image:height" content="1207">
+<meta property="og:image:width" content="2327">
+<meta name="twitter:title" content="Plotting – randseq">
+<meta name="twitter:description" content="visualizing the results">
+<meta name="twitter:image" content="https://dbikard.github.io/randseq/02_plotting_files/figure-html/cell-6-output-1.png">
+<meta name="twitter:image-height" content="1207">
+<meta name="twitter:image-width" content="2327">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">randseq</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./plotting.html">Plotting</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">randseq</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./utils.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Utils</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./plotting.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">Plotting</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">coding</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./fast.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fast</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#reading-a-randseq-result" id="toc-reading-a-randseq-result" class="nav-link active" data-scroll-target="#reading-a-randseq-result">Reading a RandSeq result</a>
+  <ul class="collapse">
+  <li><a href="#example-jj1886-on-the-20-nt-library" id="toc-example-jj1886-on-the-20-nt-library" class="nav-link" data-scroll-target="#example-jj1886-on-the-20-nt-library">Example: JJ1886 on the 20 nt library</a></li>
+  <li><a href="#custom-motif-depletion-plot" id="toc-custom-motif-depletion-plot" class="nav-link" data-scroll-target="#custom-motif-depletion-plot">Custom-motif depletion plot</a></li>
+  <li><a href="#example-jj1886-on-the-150-nt-panel" id="toc-example-jj1886-on-the-150-nt-panel" class="nav-link" data-scroll-target="#example-jj1886-on-the-150-nt-panel">Example: JJ1886 on the 150 nt panel</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="plotting.html.md"><i class="bi bi-file-code"></i>Markdown</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Plotting</h1>
+</div>
+
+<div>
+  <div class="description">
+    visualizing the results
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="reading-a-randseq-result" class="level2">
+<h2 class="anchored" data-anchor-id="reading-a-randseq-result">Reading a RandSeq result</h2>
+<p>Two plots, answering different questions.</p>
+<p><a href="https://dbikard.github.io/randseq/plotting.html#plot_motif_analysis"><code>plot_motif_analysis</code></a> shows the whole library: donor against recipient counts, one point per plasmid, with the carriers of each called motif highlighted, and beside it the log2FC distribution of each motif’s carriers against all plasmids. Plasmids absent from the recipient sit at y = 1, because a pseudocount is added before the log. It answers <em>did this strain restrict anything, and does each call look like one shifted population rather than a handful of outliers</em>.</p>
+<p><a href="https://dbikard.github.io/randseq/plotting.html#plot_motif_depletion"><code>plot_motif_depletion</code></a> takes motifs you supply instead of the ones the pipeline found: a motif REBASE predicts for the strain, or one called in another strain. It tests a specific hypothesis, including when the answer is that the motif was not restricted.</p>
+<p>Read either plot beside the result table, whose columns answer separate questions:</p>
+<ul>
+<li><code>q_value</code>: how sure we are that the carriers are depleted more than their <code>background</code> allows by chance — the depletion rate, in this sample, of plasmids with the same insert GC content. It grows with support, so a weak effect on many plasmids can be very significant.</li>
+<li><code>fraction_depleted</code>: how strong the effect is, the share of carriers depleted. For a weak motif, compare it with <code>background</code> (with <code>all_motifs=True</code>).</li>
+<li><code>bimodality</code> (with <code>all_motifs=True</code>): whether the carriers’ log2FC form one population or two. The row is flagged <code>bimodal</code> when they do (coefficient above 5/9) and one of the two groups is at background level: some carriers destroyed, others untouched, the signature of a motif that dilutes a different site.</li>
+</ul>
+<p>The histogram shows log2FC as <a href="https://dbikard.github.io/randseq/utils.html#calculate_log2fc"><code>calculate_log2fc</code></a> returns it, median-normalised: the median plasmid is at 0, and the pipeline’s default depletion threshold is at -0.5 on this axis.</p>
+<div id="44c49f74" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-10-19T19:32:26.356674+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-10-19T19:32:26.428769+00:00&quot;,&quot;total&quot;:0.07210025599999881}}" data-execution_count="5">
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/plotting.py#L19" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="plot_motif_analysis" class="level3">
+<h3 class="anchored" data-anchor-id="plot_motif_analysis">plot_motif_analysis</h3>
+<p>Donor against recipient counts with each motif’s carriers highlighted, beside their log2FC.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>plot_motif_analysis(counts_df, sample_col, ref_col, motifs, left_context,</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                    right_context, title_main<span class="op">=</span><span class="va">None</span>, pseudocount<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>                    log2fc_count_threshold<span class="op">=</span><span class="dv">20</span>, log2fc_pseudocount<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>                    figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">6</span>), save_filename<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>                    distribution_plot_log_xscale<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>counts_df</code></td>
+<td>DataFrame</td>
+<td></td>
+<td>read counts, one row per insert, one column per sample</td>
+</tr>
+<tr class="even">
+<td><code>sample_col</code></td>
+<td>str</td>
+<td></td>
+<td>the recipient sample to plot</td>
+</tr>
+<tr class="odd">
+<td><code>ref_col</code></td>
+<td>str</td>
+<td></td>
+<td>the input-library column it is compared with</td>
+</tr>
+<tr class="even">
+<td><code>motifs</code></td>
+<td>DataFrame | None</td>
+<td></td>
+<td>motifs to highlight, in a ‘motif’ column (<a href="https://dbikard.github.io/randseq/core.html#find_restricted_motifs"><code>find_restricted_motifs</code></a>)</td>
+</tr>
+<tr class="odd">
+<td><code>left_context</code></td>
+<td>str</td>
+<td></td>
+<td>vector sequence 5’ of the insert</td>
+</tr>
+<tr class="even">
+<td><code>right_context</code></td>
+<td>str</td>
+<td></td>
+<td>vector sequence 3’ of the insert</td>
+</tr>
+<tr class="odd">
+<td><code>title_main</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>figure title; default “Motif Analysis: &lt;sample_col&gt; vs &lt;ref_col&gt;”</td>
+</tr>
+<tr class="even">
+<td><code>pseudocount</code></td>
+<td>float</td>
+<td><code>1</code></td>
+<td>added to the counts per million of the scatter, before the log</td>
+</tr>
+<tr class="odd">
+<td><code>log2fc_count_threshold</code></td>
+<td>int</td>
+<td><code>20</code></td>
+<td><code>count_threshold</code> of <a href="https://dbikard.github.io/randseq/utils.html#calculate_log2fc"><code>calculate_log2fc</code></a>, for the histogram</td>
+</tr>
+<tr class="even">
+<td><code>log2fc_pseudocount</code></td>
+<td>float</td>
+<td><code>1</code></td>
+<td><code>pseudocount</code> of <a href="https://dbikard.github.io/randseq/utils.html#calculate_log2fc"><code>calculate_log2fc</code></a>, for the histogram</td>
+</tr>
+<tr class="odd">
+<td><code>figsize</code></td>
+<td>tuple</td>
+<td><code>(12, 6)</code></td>
+<td>figure size, in inches</td>
+</tr>
+<tr class="even">
+<td><code>save_filename</code></td>
+<td>str | None</td>
+<td><code>None</code></td>
+<td>also save the figure to this file, at 300 dpi</td>
+</tr>
+<tr class="odd">
+<td><code>distribution_plot_log_xscale</code></td>
+<td>bool</td>
+<td><code>False</code></td>
+<td>log scale on the histogram’s x axis</td>
+</tr>
+<tr class="even">
+<td><em>returns</em></td>
+<td>tuple</td>
+<td></td>
+<td><code>(fig, axes)</code>; <code>(None, None)</code> when <code>counts_df</code> is empty or lacks either column</td>
+</tr>
+</tbody>
+</table>
+</section>
+</div>
+<section id="example-jj1886-on-the-20-nt-library" class="level3">
+<h3 class="anchored" data-anchor-id="example-jj1886-on-the-20-nt-library">Example: JJ1886 on the 20 nt library</h3>
+<p><code>countsTable.csv.gz</code> is a run of the 20 nt library (11,629 inserts) through 19 strains, with the donor <code>MFDpir</code> as reference. JJ1886 at the default settings:</p>
+<div id="021d2bb6" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>counts_file<span class="op">=</span><span class="st">"countsTable.csv.gz"</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>file_path<span class="op">=</span>os.path.join(data_path,counts_file)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>counts<span class="op">=</span>pd.read_csv(file_path, index_col<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>counts <span class="op">=</span> counts[[col <span class="cf">for</span> col <span class="kw">in</span> counts.columns <span class="cf">if</span> (<span class="st">"_T0"</span> <span class="kw">in</span> col) <span class="kw">or</span> (<span class="st">"MFDpir"</span> <span class="kw">in</span> col)]]</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>log2fc_df <span class="op">=</span> calculate_log2fc(counts, reference_column<span class="op">=</span><span class="st">'MFDpir'</span>, count_threshold<span class="op">=</span><span class="dv">20</span>, pseudocount<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="84a40446" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>left, right <span class="op">=</span> <span class="st">"GTCCTAGGTATAATACTAGT"</span>, <span class="st">"GTTTTAGAGCTAGAAATAGC"</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>motifs <span class="op">=</span> find_restricted_motifs(log2fc_df[<span class="st">"JJ1886_T0"</span>], left, right)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>motifs</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>667 candidate(s) across all patterns; 464 remain after step 3.
+158 candidate(s) that need the vector flanks, without enough internal sites (15 would otherwise be called).
+293 candidate(s) whose score was borrowed from a stronger one.
+28 motif(s) scored.
+1 degenerate site(s) reported as one motif:
+  RTACNNNNGTG &lt;- ATACNNNNGTG + CACNNNNGTAC
+3 motif(s) called.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Scanning patterns:   0%|          | 0/43 [00:00&lt;?, ?it/s]
+Scanning patterns:   2%|2         | 1/43 [00:00&lt;00:10,  3.98it/s]
+Scanning patterns:  12%|#1        | 5/43 [00:00&lt;00:02, 16.53it/s]
+Scanning patterns:  21%|##        | 9/43 [00:00&lt;00:01, 23.37it/s]
+Scanning patterns:  30%|###       | 13/43 [00:00&lt;00:01, 27.93it/s]
+Scanning patterns:  40%|###9      | 17/43 [00:00&lt;00:00, 28.24it/s]
+Scanning patterns:  49%|####8     | 21/43 [00:00&lt;00:00, 31.41it/s]
+Scanning patterns:  58%|#####8    | 25/43 [00:00&lt;00:00, 33.72it/s]
+Scanning patterns:  67%|######7   | 29/43 [00:01&lt;00:00, 29.62it/s]
+Scanning patterns:  77%|#######6  | 33/43 [00:01&lt;00:00, 25.72it/s]
+Scanning patterns:  84%|########3 | 36/43 [00:01&lt;00:00, 22.31it/s]
+Scanning patterns:  91%|######### | 39/43 [00:01&lt;00:00, 22.78it/s]
+Scanning patterns:  98%|#########7| 42/43 [00:01&lt;00:00, 22.67it/s]
+Scanning patterns: 100%|##########| 43/43 [00:01&lt;00:00, 24.30it/s]</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">q_value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>RTACNNNNGTG</td>
+<td>212</td>
+<td>1.0</td>
+<td>-4.850774</td>
+<td>3.828852e-242</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>AAAGNNNNGTT</td>
+<td>63</td>
+<td>1.0</td>
+<td>-5.209253</td>
+<td>1.040810e-70</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>GGTCTC</td>
+<td>9</td>
+<td>1.0</td>
+<td>-4.363412</td>
+<td>1.867698e-08</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="8eddc6e8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plot_motif_analysis(counts, <span class="st">"JJ1886_T0"</span>, <span class="st">"MFDpir"</span>, motifs, left, right)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_plotting_files/figure-html/cell-6-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The three calls are JJ1886’s three RM sites: <code>AAAGNNNNGTT</code>, <code>GGTCTC</code>, and <code>RTACNNNNGTG</code>, reported as one motif from its two variants, <code>ATACNNNNGTG</code> and <code>GTACNNNNGTG</code> (the second read on the other strand, <code>CACNNNNGTAC</code>). Every carrier is destroyed: <code>fraction_depleted</code> is 1.</p>
+<p><code>all_motifs=True</code> also returns the motifs scored but not called, 24 here. Thirteen would be calls but need the vector flank and lack internal sites (<code>core</code>, <em>Sites completed by the flank</em>): <code>CACANNAGTA</code> has 190 of its 192 carriers depleted, but 188 of them read part of it in the flank, and its 4 internal carriers are too few to stand on. The rest fail the bound on the depleted fraction: <code>CTTNCACA</code> has 10 of its 20 carriers depleted (q ≈ 10⁻⁴), which bounds the fraction at 0.30, short of 0.5.</p>
+</section>
+<section id="custom-motif-depletion-plot" class="level3">
+<h3 class="anchored" data-anchor-id="custom-motif-depletion-plot">Custom-motif depletion plot</h3>
+<p>Donor against recipient counts, coloured by motifs you supply. A plasmid carrying several takes the colour of the last one in the list. Requires <code>plotnine</code>: the function returns a <code>ggplot</code> rather than drawing it, so a caller can add layers or save it at a set size, <code>p.save(filename, width=6, height=5, units="in")</code>.</p>
+<div id="41785791" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-10-19T19:32:26.433148+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-10-19T19:32:26.443744+00:00&quot;,&quot;total&quot;:0.010598921999999789}}" data-execution_count="7">
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/plotting.py#L155" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="plot_motif_depletion" class="level3">
+<h3 class="anchored" data-anchor-id="plot_motif_depletion">plot_motif_depletion</h3>
+<p>Log-log plot of one sample’s counts against the reference, coloured by the motifs you name.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>plot_motif_depletion(counts_df, sample_col, ref_col, motif_list, left_context,</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                     right_context, pseudocount<span class="op">=</span><span class="dv">1</span>, palette<span class="op">=</span>[<span class="st">'#F0A226'</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                     <span class="st">'#0A795B'</span>, <span class="st">'#800074'</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>counts_df</code></td>
+<td>DataFrame</td>
+<td></td>
+<td>read counts, one row per insert, one column per sample</td>
+</tr>
+<tr class="even">
+<td><code>sample_col</code></td>
+<td>str</td>
+<td></td>
+<td>the recipient sample to plot</td>
+</tr>
+<tr class="odd">
+<td><code>ref_col</code></td>
+<td>str</td>
+<td></td>
+<td>the input-library column it is compared with</td>
+</tr>
+<tr class="even">
+<td><code>motif_list</code></td>
+<td>list</td>
+<td></td>
+<td>motifs to colour by, in IUPAC letters and/or bracketed classes</td>
+</tr>
+<tr class="odd">
+<td><code>left_context</code></td>
+<td>str</td>
+<td></td>
+<td>vector sequence 5’ of the insert</td>
+</tr>
+<tr class="even">
+<td><code>right_context</code></td>
+<td>str</td>
+<td></td>
+<td>vector sequence 3’ of the insert</td>
+</tr>
+<tr class="odd">
+<td><code>pseudocount</code></td>
+<td>float</td>
+<td><code>1</code></td>
+<td>added to the counts per million, before the log</td>
+</tr>
+<tr class="even">
+<td><code>palette</code></td>
+<td>list</td>
+<td><code>['#F0A226', '#0A795B', '#800074']</code></td>
+<td>one colour per motif, at least as many as <code>motif_list</code></td>
+</tr>
+</tbody>
+</table>
+</section>
+</div>
+</section>
+<section id="example-jj1886-on-the-150-nt-panel" class="level3">
+<h3 class="anchored" data-anchor-id="example-jj1886-on-the-150-nt-panel">Example: JJ1886 on the 150 nt panel</h3>
+<p><code>counts_panel.csv.gz</code> holds UMI counts for eight strains in duplicate and the <code>Control</code> input library (<code>counts_panel_key.csv</code> says what each strain shows), flanked by the contexts below. The calls use the defaults: log2FC median-normalised by <a href="https://dbikard.github.io/randseq/utils.html#calculate_log2fc"><code>calculate_log2fc</code></a>, a plasmid counted as depleted at log2FC &lt; -0.5, and a motif kept when at least half of its carriers are depleted (score ≥ 0.5).</p>
+<div id="fba38a10" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>counts_panel <span class="op">=</span> pd.read_csv(os.path.join(data_path, <span class="st">"counts_panel.csv.gz"</span>), index_col<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>left_panel, right_panel <span class="op">=</span> <span class="st">"GTCTAGGGCGGCGGTAAAAC"</span>, <span class="st">"ACTAGAGCACCAGAAGTCTA"</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>log2fc_panel <span class="op">=</span> calculate_log2fc(counts_panel, reference_column<span class="op">=</span><span class="st">"Control_R1"</span>, count_threshold<span class="op">=</span><span class="dv">20</span>, pseudocount<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>log2fc_panel.describe()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Control_R2</th>
+<th data-quarto-table-cell-role="th">JJ1886_R1</th>
+<th data-quarto-table-cell-role="th">JJ1886_R2</th>
+<th data-quarto-table-cell-role="th">CFT073_R1</th>
+<th data-quarto-table-cell-role="th">CFT073_R2</th>
+<th data-quarto-table-cell-role="th">HS_R1</th>
+<th data-quarto-table-cell-role="th">HS_R2</th>
+<th data-quarto-table-cell-role="th">LMR_503_R1</th>
+<th data-quarto-table-cell-role="th">LMR_503_R2</th>
+<th data-quarto-table-cell-role="th">B156_R1</th>
+<th data-quarto-table-cell-role="th">B156_R2</th>
+<th data-quarto-table-cell-role="th">381A_R1</th>
+<th data-quarto-table-cell-role="th">381A_R2</th>
+<th data-quarto-table-cell-role="th">EDL933_R1</th>
+<th data-quarto-table-cell-role="th">EDL933_R2</th>
+<th data-quarto-table-cell-role="th">EDL933_dRM_R1</th>
+<th data-quarto-table-cell-role="th">EDL933_dRM_R2</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">count</th>
+<td>30108.000000</td>
+<td>3.010800e+04</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>3.010800e+04</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>30108.000000</td>
+<td>3.010800e+04</td>
+<td>30108.000000</td>
+<td>3.010800e+04</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">mean</th>
+<td>-0.092785</td>
+<td>-1.928490e-01</td>
+<td>-0.235595</td>
+<td>-0.027408</td>
+<td>-0.100585</td>
+<td>0.013360</td>
+<td>-0.086414</td>
+<td>-0.167986</td>
+<td>-0.203716</td>
+<td>-0.131418</td>
+<td>-1.488361e-01</td>
+<td>-0.008703</td>
+<td>0.040885</td>
+<td>0.005516</td>
+<td>-7.569209e-02</td>
+<td>0.016939</td>
+<td>-8.404360e-02</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">std</th>
+<td>0.662484</td>
+<td>9.257199e-01</td>
+<td>0.980291</td>
+<td>0.584757</td>
+<td>0.841629</td>
+<td>0.548044</td>
+<td>0.878549</td>
+<td>0.985485</td>
+<td>1.040806</td>
+<td>0.823174</td>
+<td>8.363603e-01</td>
+<td>1.140848</td>
+<td>1.403861</td>
+<td>0.505451</td>
+<td>7.503933e-01</td>
+<td>0.477549</td>
+<td>9.469204e-01</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">min</th>
+<td>-4.602036</td>
+<td>-7.591883e+00</td>
+<td>-7.471095</td>
+<td>-6.797323</td>
+<td>-7.173709</td>
+<td>-7.462027</td>
+<td>-7.930737</td>
+<td>-6.886132</td>
+<td>-7.352450</td>
+<td>-6.642861</td>
+<td>-5.341084e+00</td>
+<td>-5.498806</td>
+<td>-4.891134</td>
+<td>-8.484900</td>
+<td>-7.952919e+00</td>
+<td>-7.982994</td>
+<td>-7.284022e+00</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">25%</th>
+<td>-0.155492</td>
+<td>-2.366480e-01</td>
+<td>-0.302307</td>
+<td>-0.334449</td>
+<td>-0.223882</td>
+<td>-0.244978</td>
+<td>-0.250706</td>
+<td>-0.360724</td>
+<td>-0.347019</td>
+<td>-0.257186</td>
+<td>-3.349095e-01</td>
+<td>-0.672200</td>
+<td>-0.883312</td>
+<td>-0.251691</td>
+<td>-2.594316e-01</td>
+<td>-0.235059</td>
+<td>-4.701161e-01</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">50%</th>
+<td>0.000000</td>
+<td>-3.469447e-18</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>-8.673617e-19</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>0.000000</td>
+<td>6.938894e-18</td>
+<td>0.000000</td>
+<td>-1.387779e-17</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">75%</th>
+<td>0.154173</td>
+<td>2.150265e-01</td>
+<td>0.252766</td>
+<td>0.302789</td>
+<td>0.224322</td>
+<td>0.251669</td>
+<td>0.251436</td>
+<td>0.321928</td>
+<td>0.315946</td>
+<td>0.254159</td>
+<td>2.931217e-01</td>
+<td>0.649093</td>
+<td>0.929936</td>
+<td>0.259469</td>
+<td>2.641303e-01</td>
+<td>0.249652</td>
+<td>4.400626e-01</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">max</th>
+<td>1.404808</td>
+<td>2.108241e+00</td>
+<td>2.176589</td>
+<td>2.610762</td>
+<td>2.723555</td>
+<td>3.356025</td>
+<td>3.096185</td>
+<td>3.392317</td>
+<td>3.375307</td>
+<td>2.850857</td>
+<td>3.761570e+00</td>
+<td>6.309287</td>
+<td>6.175992</td>
+<td>2.793549</td>
+<td>2.605639e+00</td>
+<td>2.461265</td>
+<td>3.302067e+00</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="7dac05b3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>motifs_jj1886 <span class="op">=</span> find_restricted_motifs(log2fc_panel[<span class="st">"JJ1886_R1"</span>], left_panel, right_panel)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>motifs_jj1886</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>85 candidate(s) across all patterns; 4 remain after step 3.
+4 motif(s) scored.
+1 degenerate site(s) reported as one motif:
+  RTACNNNNGTG &lt;- ATACNNNNGTG + CACNNNNGTAC
+3 motif(s) called.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Scanning patterns:   0%|          | 0/43 [00:00&lt;?, ?it/s]
+Scanning patterns:   5%|4         | 2/43 [00:00&lt;00:03, 12.76it/s]
+Scanning patterns:   9%|9         | 4/43 [00:00&lt;00:03, 10.89it/s]
+Scanning patterns:  14%|#3        | 6/43 [00:00&lt;00:03, 10.66it/s]
+Scanning patterns:  19%|#8        | 8/43 [00:00&lt;00:04,  8.71it/s]
+Scanning patterns:  21%|##        | 9/43 [00:00&lt;00:03,  8.92it/s]
+Scanning patterns:  26%|##5       | 11/43 [00:01&lt;00:03,  9.84it/s]
+Scanning patterns:  30%|###       | 13/43 [00:01&lt;00:03,  9.51it/s]
+Scanning patterns:  35%|###4      | 15/43 [00:01&lt;00:03,  9.32it/s]
+Scanning patterns:  37%|###7      | 16/43 [00:01&lt;00:03,  8.65it/s]
+Scanning patterns:  40%|###9      | 17/43 [00:01&lt;00:03,  7.86it/s]
+Scanning patterns:  42%|####1     | 18/43 [00:02&lt;00:03,  7.60it/s]
+Scanning patterns:  47%|####6     | 20/43 [00:02&lt;00:02,  9.00it/s]
+Scanning patterns:  49%|####8     | 21/43 [00:02&lt;00:02,  8.62it/s]
+Scanning patterns:  53%|#####3    | 23/43 [00:02&lt;00:02,  9.04it/s]
+Scanning patterns:  56%|#####5    | 24/43 [00:02&lt;00:02,  8.76it/s]
+Scanning patterns:  60%|######    | 26/43 [00:02&lt;00:01, 10.12it/s]
+Scanning patterns:  65%|######5   | 28/43 [00:02&lt;00:01, 11.45it/s]
+Scanning patterns:  70%|######9   | 30/43 [00:03&lt;00:01, 11.33it/s]
+Scanning patterns:  74%|#######4  | 32/43 [00:03&lt;00:00, 11.46it/s]
+Scanning patterns:  79%|#######9  | 34/43 [00:03&lt;00:00, 11.44it/s]
+Scanning patterns:  84%|########3 | 36/43 [00:03&lt;00:00, 10.48it/s]
+Scanning patterns:  88%|########8 | 38/43 [00:03&lt;00:00,  9.87it/s]
+Scanning patterns:  93%|#########3| 40/43 [00:04&lt;00:00,  8.91it/s]
+Scanning patterns:  95%|#########5| 41/43 [00:04&lt;00:00,  8.86it/s]
+Scanning patterns: 100%|##########| 43/43 [00:04&lt;00:00,  8.65it/s]
+Scanning patterns: 100%|##########| 43/43 [00:04&lt;00:00,  9.45it/s]</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">num_sequences</th>
+<th data-quarto-table-cell-role="th">fraction_depleted</th>
+<th data-quarto-table-cell-role="th">avg_log2fc</th>
+<th data-quarto-table-cell-role="th">q_value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>AAAGNNNNGTT</td>
+<td>913</td>
+<td>0.997809</td>
+<td>-3.425663</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>RTACNNNNGTG</td>
+<td>963</td>
+<td>1.000000</td>
+<td>-3.285517</td>
+<td>0.000000e+00</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>GGTCTC</td>
+<td>55</td>
+<td>0.981818</td>
+<td>-2.851532</td>
+<td>2.999895e-43</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="f7cbcf1c" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plot_motif_analysis(counts_panel, <span class="st">"JJ1886_R1"</span>, <span class="st">"Control_R1"</span>, motifs_jj1886, left_panel, right_panel)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_plotting_files/figure-html/cell-10-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The same comparison for motifs you name, without running the search: here JJ1886’s three RM sites as REBASE gives them. <code>[AG]</code> and the IUPAC <code>R</code> are equivalent.</p>
+<div id="1d542d32" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>jj1886_motifs <span class="op">=</span> [<span class="st">"AAAGNNNNGTT"</span>, <span class="st">"[AG]TACNNNNGTG"</span>, <span class="st">"GGTCTC"</span>]  <span class="co"># JJ1886's RM sites</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>p <span class="op">=</span> plot_motif_depletion(counts_panel, <span class="st">"JJ1886_R1"</span>, <span class="st">"Control_R1"</span>, jj1886_motifs, left_panel, right_panel)</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>p</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_plotting_files/figure-html/cell-11-output-1.png" class="img-fluid figure-img"></p>
+</figure>
+</div>
+</div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dbikard\.github\.io\/randseq");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

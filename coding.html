@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.19">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Representing library sequences and motifs as integers, so that scoring a motif is arithmetic">
+
+<title>coding – randseq</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-f2788e636de456f6409e966386820849.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="coding – randseq">
+<meta property="og:description" content="Representing library sequences and motifs as integers, so that scoring a motif is arithmetic">
+<meta property="og:site_name" content="randseq">
+<meta name="twitter:title" content="coding – randseq">
+<meta name="twitter:description" content="Representing library sequences and motifs as integers, so that scoring a motif is arithmetic">
+<meta name="twitter:card" content="summary">
+</head>
+
+<body class="nav-sidebar floating nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">randseq</span>
+    </a>
+  </div>
+        <div class="quarto-navbar-tools tools-end">
+</div>
+          <div id="quarto-search" class="" title="Search"></div>
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./coding.html">coding</a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">randseq</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">core</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./utils.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Utils</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./plotting.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Plotting</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./coding.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">coding</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./fast.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">fast</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#why-the-scan-is-arithmetic" id="toc-why-the-scan-is-arithmetic" class="nav-link active" data-scroll-target="#why-the-scan-is-arithmetic">Why the scan is arithmetic</a>
+  <ul class="collapse">
+  <li><a href="#the-base-alphabet-and-why-it-is-acgt-in-that-order" id="toc-the-base-alphabet-and-why-it-is-acgt-in-that-order" class="nav-link" data-scroll-target="#the-base-alphabet-and-why-it-is-acgt-in-that-order">The base alphabet, and why it is <code>ACGT</code> in that order</a></li>
+  <li><a href="#from-a-window-to-an-integer-and-back" id="toc-from-a-window-to-an-integer-and-back" class="nav-link" data-scroll-target="#from-a-window-to-an-integer-and-back">From a window to an integer, and back</a></li>
+  <li><a href="#what-guarantees-this-is-right" id="toc-what-guarantees-this-is-right" class="nav-link" data-scroll-target="#what-guarantees-this-is-right">What guarantees this is right?</a></li>
+  <li><a href="#encoding-a-motif-back-to-its-code" id="toc-encoding-a-motif-back-to-its-code" class="nav-link" data-scroll-target="#encoding-a-motif-back-to-its-code">Encoding a motif back to its code</a></li>
+  <li><a href="#the-two-strands-of-one-site" id="toc-the-two-strands-of-one-site" class="nav-link" data-scroll-target="#the-two-strands-of-one-site">The two strands of one site</a></li>
+  </ul></li>
+  <li><a href="#scanning-one-pattern" id="toc-scanning-one-pattern" class="nav-link" data-scroll-target="#scanning-one-pattern">Scanning one pattern</a></li>
+  <li><a href="#reading-motif-presence-off-the-window-codes" id="toc-reading-motif-presence-off-the-window-codes" class="nav-link" data-scroll-target="#reading-motif-presence-off-the-window-codes">Reading motif presence off the window codes</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div><div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="coding.html.md"><i class="bi bi-file-code"></i>Markdown</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">coding</h1>
+</div>
+
+<div>
+  <div class="description">
+    Representing library sequences and motifs as integers, so that scoring a motif is arithmetic
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<section id="why-the-scan-is-arithmetic" class="level2">
+<h2 class="anchored" data-anchor-id="why-the-scan-is-arithmetic">Why the scan is arithmetic</h2>
+<p>The scan in <code>00_core</code> scores <strong>every</strong> motif of every pattern against every sequence, which is where its runtime goes. On strings — a Python set of motif strings per sequence — that costs roughly 10 s and 2 GB of RAM per pattern on a 30k-sequence library; on integers it is well under a second.</p>
+<p>A motif of pattern <code>(d1, spacer, d2)</code> is pinned down entirely by its <code>d1 + d2</code> defined bases — the spacer is <code>N</code> by construction — so it can be held as an integer in <code>[0, 4**(d1+d2))</code>. Every per-motif statistic then becomes an <code>np.bincount</code> over those integers, and the library is encoded once and reused for every pattern.</p>
+<p>Nothing here decides anything biological: its only job is to give exactly the answer a readable string-based scan would, faster. The checks in this notebook hold the encoding to that, and <code>tests/test_reference_scan.py</code> holds the whole scan to it.</p>
+<section id="the-base-alphabet-and-why-it-is-acgt-in-that-order" class="level3">
+<h3 class="anchored" data-anchor-id="the-base-alphabet-and-why-it-is-acgt-in-that-order">The base alphabet, and why it is <code>ACGT</code> in that order</h3>
+<p><code>A=0, C=1, G=2, T=3</code>, and anything else — <code>N</code>, lowercase junk, the padding of a short sequence — is <code>4</code>.</p>
+<p>The order is not arbitrary. Complementary bases sit at opposite ends of it, so <strong>complementing a base is <code>3 - code</code></strong>: A↔︎T is 0↔︎3, C↔︎G is 1↔︎2. That is the whole reverse-complement implementation, and it is why <a href="https://dbikard.github.io/randseq/coding.html#encode_library"><code>encode_library</code></a> can return the reverse strand for the price of one subtraction and one reversal.</p>
+<p>Code <code>4</code> does double duty: it marks a base that is not ACGT <em>and</em> the padding that squares off a ragged library into a rectangular array. Both must be excluded from the scan, and because they share a marker, one test excludes both — there is no separate length bookkeeping to get wrong.</p>
+<div id="28168cd2" class="cell" data-quarto-private-1="{&quot;key&quot;:&quot;execution&quot;,&quot;value&quot;:{&quot;iopub.execute_input&quot;:&quot;2026-10-19T19:32:25.718158+00:00&quot;,&quot;shell.execute_reply&quot;:&quot;2026-10-19T19:32:26.532561+00:00&quot;,&quot;total&quot;:0.8144074149999909}}" data-execution_count="4">
+<hr>
+<p><a href="https://github.com/dbikard/randseq/blob/main/randseq/coding.py#L22" target="_blank" style="float:right; font-size:smaller">source</a></p>
+<section id="encode_library" class="level3">
+<h3 class="anchored" data-anchor-id="encode_library">encode_library</h3>
+<p>Encode DNA sequences as base codes, the form the scan reads (<code>encoded_library</code>).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>encode_library(sequences)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sequences</code></td>
+<td>list</td>
+<td></td>
+<td>DNA strings, e.g.&nbsp;inserts with their flanks; lengths may differ</td>
+</tr>
+<tr class="even">
+<td><em>returns</em></td>
+<td>tuple</td>
+<td></td>
+<td><code>(fwd, rc)</code>: uint8 base codes (n_sequences, max_length) of each sequence and its rc</td>
+</tr>
+</tbody>
+</table>
+</section>
+</div>
+<div id="3851665f" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>fwd, rc <span class="op">=</span> encode_library([<span class="st">"ACGTT"</span>, <span class="st">"ggN"</span>])</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>fwd, rc</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(array([[0, 1, 2, 3, 3],
+        [2, 2, 4, 4, 4]], dtype=uint8),
+ array([[0, 0, 1, 2, 3],
+        [4, 1, 1, 4, 4]], dtype=uint8))</code></pre>
+</div>
+</div>
+<p>Both strands are left-aligned and padded on the right, so row <code>i</code> of <code>rc</code> is the reverse complement of sequence <code>i</code> occupying its first <code>len(s)</code> columns — not a reversal of the padded row, which would put the padding at the front.</p>
+</section>
+<section id="from-a-window-to-an-integer-and-back" class="level3">
+<h3 class="anchored" data-anchor-id="from-a-window-to-an-integer-and-back">From a window to an integer, and back</h3>
+<p>Write the <code>d1 + d2</code> defined bases of a motif as the digits of a <strong>base-4 numeral</strong>:</p>
+<pre><code>CAC NNNN GTAT   -&gt;  digits C,A,C,G,T,A,T  -&gt;  1·4⁶ + 0·4⁵ + 1·4⁴ + 2·4³ + 3·4² + 0·4 + 3</code></pre>
+<p><a href="https://dbikard.github.io/randseq/coding.html#_pattern_window_codes"><code>_pattern_window_codes</code></a> builds that numeral by Horner’s method — <code>code = code*4 + next_digit</code>, one pass over the defined positions in increasing order. The trick that makes it fast is that each step operates on a <strong>sliding view</strong>, <code>encoded_seqs[:, j:j+n_windows]</code>: position <code>j</code> of the window starting at <code>w</code> is absolute index <code>w+j</code>, so as <code>w</code> runs over all windows that column is exactly the slice above. Every window of every sequence is therefore built in parallel, with one vector operation per defined base rather than one per window.</p>
+<p><strong>Rejecting windows.</strong> A window containing a non-ACGT base anywhere — spacer included, to match the <code>[ATGC]</code> regex the reference implementation uses — is set to <code>4**(d1+d2)</code>, one past the largest real code. Which windows those are comes from a prefix sum over the <code>== 4</code> mask: the number of bad bases in <code>[w, w+width)</code> is <code>n_bad[w+width] - n_bad[w]</code>, so all windows are tested at once. Padding is code 4, so a window running off the end of a short sequence is rejected by the same test, with nothing extra written for it.</p>
+<p><strong>Decoding</strong> reverses the numeral. Base 4 is two bits, so digit <code>i</code> counted from the most significant is <code>(code &gt;&gt; 2*(n-1-i)) &amp; 3</code> — the same digits in the same order the encoder wrote them. <a href="https://dbikard.github.io/randseq/coding.html#_decode_motif_codes"><code>_decode_motif_codes</code></a> then drops <code>N</code> into the spacer positions.</p>
+<p>With pattern <code>(1, 2, 2)</code>, <code>CAAGT</code> has a single window whose defined bases are C, G, T, i.e.&nbsp;code <code>1*16 + 2*4 + 3 = 27</code>. A window touching the <code>N</code> is rejected (code <code>4**3 = 64</code>):</p>
+<div id="987d00c8" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>fwd, rc <span class="op">=</span> encode_library([<span class="st">"CAAGT"</span>, <span class="st">"CAAGTN"</span>])</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># A=0 C=1 G=2 T=3, so a motif's code is literally its defined bases as a base-4 numeral:</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># CNNGT of pattern (1,2,2) has defined bases C,G,T -&gt; digits 1,2,3 -&gt; int("123", 4).</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>CNNGT <span class="op">=</span> <span class="bu">int</span>(<span class="st">"123"</span>, <span class="dv">4</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>REJECTED <span class="op">=</span> <span class="dv">4</span> <span class="op">**</span> <span class="dv">3</span>            <span class="co"># the sentinel: one past the largest 3-digit base-4 numeral</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"CNNGT = </span><span class="sc">{</span>CNNGT<span class="sc">}</span><span class="ss">, REJECTED = </span><span class="sc">{</span>REJECTED<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(_pattern_window_codes(fwd, (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>)))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>_decode_motif_codes([CNNGT, <span class="bu">int</span>(<span class="st">"000"</span>, <span class="dv">4</span>)], (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>CNNGT = 27, REJECTED = 64
+[[27 64]
+ [27 64]]</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>['CNNGT', 'ANNAA']</code></pre>
+</div>
+</div>
+</section>
+<section id="what-guarantees-this-is-right" class="level3">
+<h3 class="anchored" data-anchor-id="what-guarantees-this-is-right">What guarantees this is right?</h3>
+<p>The scan reports a motif string, but everything between the library and that string is integer arithmetic. Four properties have to hold, or the output is confidently wrong rather than obviously broken.</p>
+<p><strong>1. Distinct motifs get distinct codes.</strong> A base-4 numeral with a <em>fixed</em> number of digits is unique to its digit string — that is just positional notation — and the digit count is fixed at <code>d1+d2</code> for a given pattern. Two different motifs of the same pattern therefore cannot collide.</p>
+<p><strong>2. Decoding is exactly the inverse of encoding.</strong> Both walk the same <code>d1+d2</code> positions in the same order; the encoder multiplies up, the decoder shifts down. Cheap enough to check <em>exhaustively</em> rather than argue about, which this notebook’s tests do.</p>
+<p><strong>3. A rejected window can never be read as a motif.</strong> Real codes fill <code>[0, 4**(d1+d2))</code> and the sentinel is <code>4**(d1+d2)</code> exactly, so the single test <code>code &lt; 4**(d1+d2)</code> separates them with no gap and no overlap. This is why the sentinel is that value and not, say, <code>-1</code>.</p>
+<p><strong>4. The arithmetic stays in range.</strong> Codes are <code>int32</code>, which holds 15 defined bases; the shipped patterns use at most 8. Beyond 15 the numeral would wrap and every count for that pattern would be quietly wrong, so <a href="https://dbikard.github.io/randseq/coding.html#_pattern_window_codes"><code>_pattern_window_codes</code></a> raises instead.</p>
+<p>Properties 1–3 hold by construction and are verified exhaustively by this notebook’s tests. Whether the <em>whole scan</em> means the same thing as a readable implementation is a separate question: <code>tests/test_reference_scan.py</code> runs <a href="https://dbikard.github.io/randseq/fast.html#_get_pattern_scores"><code>_get_pattern_scores</code></a> against the string-based scan in <code>tests/reference_scan.py</code> and requires identical tables.</p>
+</section>
+<section id="encoding-a-motif-back-to-its-code" class="level3">
+<h3 class="anchored" data-anchor-id="encoding-a-motif-back-to-its-code">Encoding a motif back to its code</h3>
+<p><a href="https://dbikard.github.io/randseq/coding.html#_encode_motif"><code>_encode_motif</code></a> is the inverse of <a href="https://dbikard.github.io/randseq/coding.html#_decode_motif_codes"><code>_decode_motif_codes</code></a>: it turns a motif string back into the integer the scan counts under. It returns <code>None</code> for anything it cannot represent — an IUPAC-degenerate motif has no single code, and nor has a motif that does not fit the pattern — so a caller can expand a degenerate motif into its instances (<a href="https://dbikard.github.io/randseq/core.html#_motif_instances"><code>_motif_instances</code></a> in <code>core</code>) or fall back to a regex, rather than silently mis-assign sequences. <code>tests/test_vectorized_presence.py</code> checks the two paths agree element for element.</p>
+<div id="d650c1bb" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># the decode example above, inverted: CNNGT is digits 1,2,3; an IUPAC base has no single code</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>_encode_motif(<span class="st">"CNNGT"</span>, (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>)), _encode_motif(<span class="st">"YNNGT"</span>, (<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">2</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>(27, None)</code></pre>
+</div>
+</div>
+</section>
+<section id="the-two-strands-of-one-site" class="level3">
+<h3 class="anchored" data-anchor-id="the-two-strands-of-one-site">The two strands of one site</h3>
+<p>An enzyme cuts a double-stranded site, so <code>GAGACC</code> and <code>GGTCTC</code> are one motif seen from two sides, and the scan must not count them as two. <em>Where</em> they can be folded together is decided by the pattern, because a motif of <code>(d1, spacer, d2)</code> reverse-complements into one of <code>(d2, spacer, d1)</code>:</p>
+<ul>
+<li>when that is the <strong>same</strong> shape — a contiguous motif (<code>spacer == 0</code>), or a balanced one (<code>d1 == d2</code>) — both spellings are codes in the <em>same</em> space, and one physical site is found twice, once per strand. These fold.</li>
+<li>otherwise the rc spelling lives in <strong>another pattern’s</strong> space. Nothing to fold: scanning <code>(3, 4, 4)</code> on both strands already finds each site exactly once, because a <code>(4, 4, 3)</code> site is read on the reverse strand and spelled as <code>(3, 4, 4)</code>. This is why <a href="https://dbikard.github.io/randseq/core.html#find_restricted_motifs"><code>find_restricted_motifs</code></a> rewrites every pattern to its <a href="https://dbikard.github.io/randseq/utils.html#_canonical_pattern"><code>_canonical_pattern</code></a> and drops duplicates — searching both shapes would re-find the same sites in mirror spelling, at twice the cost.</li>
+</ul>
+<p>Folding an asymmetric pattern would merge two <em>unrelated</em> motifs, since reversing the digits of a <code>(4, 4, 3)</code> code reads the <code>d2</code> bases where the <code>d1</code> bases belong. <a href="https://dbikard.github.io/randseq/coding.html#_rc_code_table"><code>_rc_code_table</code></a> therefore refuses any pattern that is not self-rc.</p>
+<p>The table itself is one observation: a code is the defined bases as a base-4 numeral, and the defined bases of the reverse complement are those digits <strong>reversed and complemented</strong> (<code>A&lt;-&gt;T, C&lt;-&gt;G</code> is <code>3 - digit</code>). The spacer is undefined on both strands, so it plays no part. Because each base is two bits, both operations are bit arithmetic on the code: complementing every digit is a single XOR with <code>11</code> repeated <code>k</code> times, and reversing the digits is reversing the order of the 2-bit groups. <a href="https://dbikard.github.io/randseq/coding.html#_rc_code_table"><code>_rc_code_table</code></a> builds the table that way, and this notebook’s tests check it against <a href="https://dbikard.github.io/randseq/utils.html#revcomp"><code>revcomp</code></a> on the motif strings over entire code spaces.</p>
+<div id="d334ae48" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># GAGACC and GGTCTC are one site: the table maps each spelling's code to the other's</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>_t <span class="op">=</span> _rc_code_table((<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(_decode_motif_codes([_t[_encode_motif(<span class="st">"GAGACC"</span>, (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>))]], (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>)))</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># contiguous and balanced patterns fold; (3, 4, 4) does not, its rc motifs are (4, 4, 3)</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>[_pattern_is_self_rc(p) <span class="cf">for</span> p <span class="kw">in</span> [(<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>), (<span class="dv">4</span>, <span class="dv">4</span>, <span class="dv">4</span>), (<span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">4</span>)]]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>['GGTCTC']</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<pre><code>[True, True, False]</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="scanning-one-pattern" class="level2">
+<h2 class="anchored" data-anchor-id="scanning-one-pattern">Scanning one pattern</h2>
+<p>A pattern is scored from two arrays: which motifs each sequence carries, and the totals of each motif over its carriers. The library below is twelve inserts of twelve bases with <code>GAGACC</code> (<code>GGTCTC</code> on the other strand) planted in four of them, and those four are the depleted ones, so a correct scan must report <code>GAGACC</code> on four plasmids, all depleted.</p>
+<div id="a3fe1691" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>demo_lib <span class="op">=</span> [<span class="st">"GAGACCTTAACG"</span>, <span class="st">"TTGAGACCGCAT"</span>, <span class="st">"ACGGTCTCAATG"</span>, <span class="st">"CCAAGAGACCTT"</span>,</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>            <span class="st">"ACGTTGCAATGC"</span>, <span class="st">"TTACGCATTGCA"</span>, <span class="st">"GCATTACGGTTA"</span>, <span class="st">"ATGCCATTGCAA"</span>,</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">"CATGCAATTGCG"</span>, <span class="st">"TTGCAATGCCAT"</span>, <span class="st">"GCAATTGCATGC"</span>, <span class="st">"ATTGCCATGCAA"</span>]</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>demo_fc <span class="op">=</span> np.array([<span class="op">-</span><span class="fl">2.5</span>, <span class="op">-</span><span class="fl">3.0</span>, <span class="op">-</span><span class="fl">3.5</span>, <span class="op">-</span><span class="fl">3.0</span>, <span class="fl">0.2</span>, <span class="op">-</span><span class="fl">0.1</span>, <span class="fl">0.0</span>, <span class="fl">0.3</span>, <span class="op">-</span><span class="fl">0.2</span>, <span class="fl">0.1</span>, <span class="fl">0.0</span>, <span class="op">-</span><span class="fl">0.3</span>])</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>pd.DataFrame({<span class="st">"insert"</span>: demo_lib, <span class="st">"log2FC"</span>: demo_fc,</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>              <span class="st">"carries the site"</span>: [(<span class="st">"GAGACC"</span> <span class="kw">in</span> s) <span class="kw">or</span> (<span class="st">"GGTCTC"</span> <span class="kw">in</span> s) <span class="cf">for</span> s <span class="kw">in</span> demo_lib],</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>              <span class="st">"depleted (&lt; -1)"</span>: demo_fc <span class="op">&lt;</span> <span class="op">-</span><span class="dv">1</span>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">insert</th>
+<th data-quarto-table-cell-role="th">log2FC</th>
+<th data-quarto-table-cell-role="th">carries the site</th>
+<th data-quarto-table-cell-role="th">depleted (&lt; -1)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>GAGACCTTAACG</td>
+<td>-2.5</td>
+<td>True</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>TTGAGACCGCAT</td>
+<td>-3.0</td>
+<td>True</td>
+<td>True</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>ACGGTCTCAATG</td>
+<td>-3.5</td>
+<td>True</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>CCAAGAGACCTT</td>
+<td>-3.0</td>
+<td>True</td>
+<td>True</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>ACGTTGCAATGC</td>
+<td>0.2</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>TTACGCATTGCA</td>
+<td>-0.1</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>GCATTACGGTTA</td>
+<td>0.0</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>ATGCCATTGCAA</td>
+<td>0.3</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">8</th>
+<td>CATGCAATTGCG</td>
+<td>-0.2</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>TTGCAATGCCAT</td>
+<td>0.1</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">10</th>
+<td>GCAATTGCATGC</td>
+<td>0.0</td>
+<td>False</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">11</th>
+<td>ATTGCCATGCAA</td>
+<td>-0.3</td>
+<td>False</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p><strong>Which motifs each sequence carries.</strong> <a href="https://dbikard.github.io/randseq/coding.html#_motif_occurrences"><code>_motif_occurrences</code></a> scans every window of both strands and reduces the result to one entry per sequence and motif: a motif occurring twice in an insert, or once on each strand, is one plasmid carrying it. For a self-rc pattern the two spellings of a site are folded onto the smaller code (<a href="https://dbikard.github.io/randseq/coding.html#_rc_code_table"><code>_rc_code_table</code></a>); for any other pattern the rc spelling is not in this code space, so there is nothing to fold. Either way each pattern emits one row per plasmid per site.</p>
+<div id="530a76c5" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>seq_idx, motif_codes <span class="op">=</span> _motif_occurrences(encode_library(demo_lib), (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>occurrences <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"sequence"</span>: [demo_lib[i] <span class="cf">for</span> i <span class="kw">in</span> seq_idx],</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"motif"</span>: _decode_motif_codes(motif_codes, (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>)),</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># the code IS the motif: A=0 C=1 G=2 T=3, read as a base-4 numeral</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"code (base 4)"</span>: [np.base_repr(c, <span class="dv">4</span>).zfill(<span class="dv">6</span>) <span class="cf">for</span> c <span class="kw">in</span> motif_codes],</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"code"</span>: motif_codes})</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(occurrences)<span class="sc">}</span><span class="ss"> (sequence, motif) pairs from </span><span class="sc">{</span><span class="bu">len</span>(demo_lib)<span class="sc">}</span><span class="ss"> sequences"</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>occurrences.head(<span class="dv">8</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>82 (sequence, motif) pairs from 12 sequences</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">sequence</th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">code (base 4)</th>
+<th data-quarto-table-cell-role="th">code</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>GAGACCTTAACG</td>
+<td>AAGGTC</td>
+<td>002231</td>
+<td>173</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>GAGACCTTAACG</td>
+<td>ACCTTA</td>
+<td>011330</td>
+<td>380</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>GAGACCTTAACG</td>
+<td>AGACCT</td>
+<td>020113</td>
+<td>535</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>GAGACCTTAACG</td>
+<td>CCTTAA</td>
+<td>113300</td>
+<td>1520</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>GAGACCTTAACG</td>
+<td>CGTTAA</td>
+<td>123300</td>
+<td>1776</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>GAGACCTTAACG</td>
+<td>CTTAAC</td>
+<td>133001</td>
+<td>1985</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>GAGACCTTAACG</td>
+<td>GAGACC</td>
+<td>202011</td>
+<td>2181</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>TTGAGACCGCAT</td>
+<td>ACCGCA</td>
+<td>011210</td>
+<td>356</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Each row is one plasmid carrying one motif, and the base-4 column shows that a code <strong>is</strong> the motif: <code>GAGACC</code> is <code>202011</code>. The planted site:</p>
+<div id="05b25ea6" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>occurrences[occurrences.motif.isin([<span class="st">"GAGACC"</span>, <span class="st">"GGTCTC"</span>])]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">sequence</th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">code (base 4)</th>
+<th data-quarto-table-cell-role="th">code</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>GAGACCTTAACG</td>
+<td>GAGACC</td>
+<td>202011</td>
+<td>2181</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">11</th>
+<td>TTGAGACCGCAT</td>
+<td>GAGACC</td>
+<td>202011</td>
+<td>2181</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">18</th>
+<td>ACGGTCTCAATG</td>
+<td>GAGACC</td>
+<td>202011</td>
+<td>2181</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">27</th>
+<td>CCAAGAGACCTT</td>
+<td>GAGACC</td>
+<td>202011</td>
+<td>2181</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>Four sequences, one row each: <code>GGTCTC</code> is the same site read on the other strand, folded onto <code>GAGACC</code>, the smaller numeral. Reporting re-spells it on the strand REBASE uses (<a href="https://dbikard.github.io/randseq/utils.html#canonical_motif"><code>canonical_motif</code></a>).</p>
+<p>A window containing a base other than ACGT is dropped, and so is one running past the end of a short sequence, since padding carries the same code as <code>N</code>:</p>
+<div id="5bac3090" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>edge <span class="op">=</span> [<span class="st">"GAGACCTT"</span>,           <span class="co"># clean</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>        <span class="st">"GAGACCTTNAAAAAA"</span>,    <span class="co"># an N at position 8, then six more bases</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>        <span class="st">"GAGAC"</span>]              <span class="co"># shorter than the 6-base pattern</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>_s, _c <span class="op">=</span> _motif_occurrences(encode_library(edge), (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>))</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>pd.DataFrame({<span class="st">"sequence"</span>: [edge[i] <span class="cf">for</span> i <span class="kw">in</span> _s], <span class="st">"motif"</span>: _decode_motif_codes(_c, (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>))})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">sequence</th>
+<th data-quarto-table-cell-role="th">motif</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>GAGACCTT</td>
+<td>AAGGTC</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>GAGACCTT</td>
+<td>AGACCT</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>GAGACCTT</td>
+<td>GAGACC</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>GAGACCTTNAAAAAA</td>
+<td>AAAAAA</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>GAGACCTTNAAAAAA</td>
+<td>AAGGTC</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>GAGACCTTNAAAAAA</td>
+<td>AGACCT</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>GAGACCTTNAAAAAA</td>
+<td>GAGACC</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>The second insert keeps the windows that end before its <code>N</code>, loses the six that cover it, and picks up <code>AAAAAA</code> after it (<code>TTTTTT</code> on the other strand, folded). Every window of the third runs into the padding.</p>
+<p><strong>Totals per motif.</strong> Every statistic the scan reports is a sum over a motif’s carriers, so each is one <code>np.bincount</code>: carriers, depleted carriers, the sum of their log2FC, the sum of their background (each plasmid’s expected depletion rate, from <a href="https://dbikard.github.io/randseq/utils.html#plasmid_background"><code>plasmid_background</code></a>; here one rate for all), and the first carrier, which makes the output order a function of the library rather than of hash order.</p>
+<div id="85ef5627" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>demo_bg <span class="op">=</span> np.full(<span class="bu">len</span>(demo_lib), (demo_fc <span class="op">&lt;</span> <span class="op">-</span><span class="dv">1</span>).mean())      <span class="co"># one rate for all: 4 of 12</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>n_seqs, n_depleted, fc_sum, bg_sum, first_seq <span class="op">=</span> _motif_totals(</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    seq_idx, motif_codes, demo_fc, demo_bg, <span class="op">-</span><span class="dv">1</span>, <span class="dv">4</span> <span class="op">**</span> <span class="dv">6</span>)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>present <span class="op">=</span> np.flatnonzero(n_seqs)                 <span class="co"># the motifs this library actually contains</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>totals <span class="op">=</span> pd.DataFrame({<span class="st">"motif"</span>: _decode_motif_codes(present, (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>)),</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>                       <span class="st">"n_seqs"</span>: n_seqs[present], <span class="st">"n_depleted"</span>: n_depleted[present],</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>                       <span class="st">"sum_log2fc"</span>: fc_sum[present], <span class="st">"sum_background"</span>: bg_sum[present],</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>                       <span class="st">"first_seq"</span>: first_seq[present]})</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span><span class="bu">len</span>(totals)<span class="sc">}</span><span class="ss"> motifs present out of </span><span class="sc">{</span><span class="dv">4</span> <span class="op">**</span> <span class="dv">6</span><span class="sc">}</span><span class="ss"> possible"</span>)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>totals.sort_values([<span class="st">"n_depleted"</span>, <span class="st">"n_seqs"</span>], ascending<span class="op">=</span><span class="va">False</span>).head(<span class="dv">6</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>53 motifs present out of 4096 possible</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">motif</th>
+<th data-quarto-table-cell-role="th">n_seqs</th>
+<th data-quarto-table-cell-role="th">n_depleted</th>
+<th data-quarto-table-cell-role="th">sum_log2fc</th>
+<th data-quarto-table-cell-role="th">sum_background</th>
+<th data-quarto-table-cell-role="th">first_seq</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">43</th>
+<td>GAGACC</td>
+<td>4</td>
+<td>4.0</td>
+<td>-12.0</td>
+<td>1.333333</td>
+<td>0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2</th>
+<td>AAGGTC</td>
+<td>2</td>
+<td>2.0</td>
+<td>-5.5</td>
+<td>0.666667</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">13</th>
+<td>AGACCG</td>
+<td>2</td>
+<td>2.0</td>
+<td>-6.5</td>
+<td>0.666667</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">14</th>
+<td>AGACCT</td>
+<td>2</td>
+<td>2.0</td>
+<td>-5.5</td>
+<td>0.666667</td>
+<td>0</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">47</th>
+<td>GTCTCA</td>
+<td>2</td>
+<td>2.0</td>
+<td>-6.5</td>
+<td>0.666667</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">50</th>
+<td>TCTCAA</td>
+<td>2</td>
+<td>2.0</td>
+<td>-6.5</td>
+<td>0.666667</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p><code>GAGACC</code> tops the table with four carriers, all depleted. <code>05_fast</code> turns these totals into the reported scores, and adds a compiled kernel that computes them in one pass.</p>
+</section>
+<section id="reading-motif-presence-off-the-window-codes" class="level2">
+<h2 class="anchored" data-anchor-id="reading-motif-presence-off-the-window-codes">Reading motif presence off the window codes</h2>
+<p>Scoring a pattern asks what motifs a sequence contains. The rest of the pipeline asks the reverse, of a handful of specific candidates: <strong>which sequences contain this motif, on either strand?</strong></p>
+<p>Done directly that is a regex per sequence per motif, and a noisy strain, which carries the most candidates, pays for it most. Instead presence is a <strong>lookup in the window codes</strong>, done once per pattern rather than once per motif: for 200 motifs of 4 patterns on the 150 nt example library (<code>counts_panel.csv.gz</code>, 30,108 inserts after the count filter), 0.3 s against 6 s for the regex, with identical answers.</p>
+<p><a href="https://dbikard.github.io/randseq/coding.html#_motif_presence_matrix"><code>_motif_presence_matrix</code></a> returns <code>(matrix, handled)</code>. A motif the fast path cannot encode — IUPAC-degenerate, or of an unknown pattern — is left as an all-<code>False</code> column and flagged in <code>handled</code>, so the caller does not read a blank column as “absent”: <code>core</code> reads a degenerate motif through its instances, each of which has a code, and a motif of unknown pattern by regex.</p>
+<p>With <code>insert</code> (the lengths of the two flanks and of each insert) it also says which sequences carry the motif wholly inside the insert, from the same windows: this is how <code>core</code> tells a site from one the vector flank completes (<em>Sites completed by the flank</em>).</p>
+<div id="a57d5da3" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>_seqs <span class="op">=</span> [<span class="st">"GAGACCTT"</span>, <span class="st">"AAGGTCTC"</span>, <span class="st">"TTTTTTTT"</span>, <span class="st">"GGGGGGGG"</span>]</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>_m, _handled <span class="op">=</span> _motif_presence_matrix(encode_library(_seqs), [<span class="st">"GAGACC"</span>, <span class="st">"TTTTTT"</span>],</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>                                     [(<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>), (<span class="dv">6</span>, <span class="dv">0</span>, <span class="dv">0</span>)])</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>pd.DataFrame(_m, index<span class="op">=</span>_seqs, columns<span class="op">=</span>[<span class="st">"GAGACC"</span>, <span class="st">"TTTTTT"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">GAGACC</th>
+<th data-quarto-table-cell-role="th">TTTTTT</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">GAGACCTT</th>
+<td>True</td>
+<td>False</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">AAGGTCTC</th>
+<td>True</td>
+<td>False</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">TTTTTTTT</th>
+<td>False</td>
+<td>True</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">GGGGGGGG</th>
+<td>False</td>
+<td>False</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>One row per sequence, one column per motif. <code>GAGACC</code> is found in the second sequence only on the other strand, where it is spelled <code>GGTCTC</code>: presence means “on either strand”.</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/dbikard\.github\.io\/randseq");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/dbikard/randseq/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer></body></html>

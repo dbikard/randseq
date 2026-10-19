@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-19)
 
 A rework of motif calling. Every call now carries a significance value, a site is reported
 once, and the output is a single table. The notebooks document each step.

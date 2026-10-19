@@ -9,7 +9,7 @@ once, and the output is a single table. The notebooks document each step.
 
 - The main functions are importable from the package: `from randseq import calculate_log2fc,
   find_restricted_motifs, plot_motif_analysis` (also `get_patterns`, `plot_motif_depletion`,
-  `plan_library`, `get_example_data_dir`, `TooManyCandidatesError`).
+  `get_example_data_dir`, `TooManyCandidatesError`).
 
 - `find_restricted_motifs` returns one table, not a `(fixed, flex)` tuple: the called motifs, in
   five columns (`motif`, `num_sequences`, `fraction_depleted`, `avg_log2fc`, `q_value`), sorted
@@ -40,7 +40,7 @@ once, and the output is a single table. The notebooks document each step.
   `get_custom_motif_presence_in_library`, `get_log2fc_distribution_by_motif`, and for analysis
   scripts `generate_tuple_combinations`, `filter_symmetric_tuples` and
   `find_iupac_equivalent_motifs` (`randseq.utils`); `encode_library` (`randseq.coding`); the
-  plotting and design functions. The pipeline's steps and helpers are private (leading
+  plotting functions. The pipeline's steps and helpers are private (leading
   underscore), and the scan of one pattern moved to `randseq.fast`. `score` and
   `get_motif_filter_with_context` are removed: `get_custom_motif_presence_in_library` is the
   motif lookup.
@@ -96,9 +96,6 @@ carriers that need the flanks, and the test of the others) are in it too; `call_
   merges, the number called. `verbose=True` also lists each candidate set aside for the flanks,
   each candidate step 4 removes and each motif scored.
 - IUPAC-aware `revcomp` and `canonical_motif`; `normalise_motif` accepts bracketed classes.
-- `randseq.design`: `plan_library` (which motif architectures a library and vector can detect,
-  and the library size a site needs), `min_carriers`, and `carrier_fraction` (now exported and
-  width-aware for gapped patterns).
 - Optional compiled scan: `pip install "randseq[fast]"` (numba); results are identical.
 - Removed: the unused attic module.
 

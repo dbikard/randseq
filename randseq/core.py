@@ -297,23 +297,25 @@ def _motif_instances(motif, pattern):
     return ["".join(t) for t in product(*choices)]
 
 
-def _instance_presence(encoded, motifs, patterns):
+def _instance_presence(encoded, motifs, patterns, insert=None):
     """`_motif_presence_matrix` for motifs with IUPAC letters: a plasmid carries a motif when it
-    carries one of its instances (`_motif_instances`), on either strand. Returns `(matrix, handled)`;
-    a motif whose pattern is unknown, or which does not fit it, is not handled."""
+    carries one of its instances (`_motif_instances`), on either strand. Returns `(matrix, handled)`,
+    or `(matrix, inside, handled)` with `insert` (as for `_motif_presence_matrix`); a motif whose
+    pattern is unknown, or which does not fit it, is not handled."""
     inst = [_motif_instances(m, p) if p is not None else [] for m, p in zip(motifs, patterns)]
     # Each distinct instance is looked up once, however many motifs share it.
     keys = list(dict.fromkeys((x, p) for xs, p in zip(inst, patterns) for x in xs))
     col = {k: j for j, k in enumerate(keys)}
-    has, ok = _motif_presence_matrix(encoded, [x for x, _ in keys], [p for _, p in keys])
-    presence = np.zeros((encoded[0].shape[0], len(motifs)), dtype=bool)
+    *found, ok = _motif_presence_matrix(encoded, [x for x, _ in keys], [p for _, p in keys], insert)
+    out = [np.zeros((encoded[0].shape[0], len(motifs)), dtype=bool) for _ in found]
     handled = np.zeros(len(motifs), dtype=bool)
     for j, (xs, p) in enumerate(zip(inst, patterns)):
         cols = [col[(x, p)] for x in xs]
         if cols and ok[cols].all():
-            presence[:, j] = has[:, cols].any(axis=1)
+            for o, has in zip(out, found):
+                o[:, j] = has[:, cols].any(axis=1)
             handled[j] = True
-    return presence, handled
+    return (*out, handled)
 
 
 def _carriers(
@@ -321,15 +323,20 @@ def _carriers(
     motifs:list, # motif strings, IUPAC letters allowed
     patterns:list, # each motif's `(d1, spacer, d2)`, or None where unknown
     log2fc_series:pd.Series, # log2FC indexed by insert, read by the regex fallback
-    left_context:str, # vector sequence 5' of the insert, for the regex fallback
-    right_context:str, # vector sequence 3' of the insert, for the regex fallback
-)->np.ndarray: # boolean, (n_sequences, n_motifs)
+    left_context:str, # vector sequence 5' of the insert
+    right_context:str, # vector sequence 3' of the insert
+    inside:bool=False, # also return the carriers with a site wholly inside the insert
+)->np.ndarray: # boolean, (n_sequences, n_motifs); with `inside`, `(carriers, internal carriers)`
     "Which plasmids carry each motif, on either strand."
-    presence, handled = _instance_presence(encoded, motifs, patterns)
+    insert = (len(left_context), len(right_context),
+              np.array([len(s) for s in log2fc_series.index])) if inside else None
+    *found, handled = _instance_presence(encoded, motifs, patterns, insert)
     for j in np.flatnonzero(~handled):
-        presence[:, j] = _get_filter_for_motif(
+        found[0][:, j] = _get_filter_for_motif(
             log2fc_series, motifs[j], left_context, right_context).to_numpy()
-    return presence
+        if inside:
+            found[1][:, j] = _get_filter_for_motif(log2fc_series, motifs[j], "", "").to_numpy()
+    return tuple(found) if inside else found[0]
 
 # %% ../nbs/00_core.ipynb #8bc15550
 def _filter_redundant_patterns(
@@ -378,9 +385,15 @@ def _filter_redundant_patterns(
 _JUNCTION_SHARE = 0.5   # above this share of carriers needing the flanks, the internal ones decide
 
 
+def _depleted_lower(n, k, level):
+    """One-sided lower confidence bound (Clopper-Pearson, at `level`) on the depleted fraction of `n`
+    carriers, `k` of them depleted; 0 when none is."""
+    return np.where(k > 0, beta.ppf(level, np.maximum(k, 1), n - k + 1), 0.0)
+
+
 def _junction_support(
     presence:np.ndarray, # carriers of each motif, read with the flanks (`_carriers`)
-    inside:np.ndarray, # carriers with a site wholly inside the insert (`_carriers` on the inserts)
+    inside:np.ndarray, # carriers with a site wholly inside the insert (`_carriers`, `inside=True`)
     fc:np.ndarray, # log2FC per plasmid
     background:np.ndarray, # expected depletion per plasmid (`plasmid_background`)
     log2fc_thr:float, # a plasmid is depleted below this
@@ -391,9 +404,9 @@ def _junction_support(
     k = (fc < log2fc_thr).astype(float) @ inside
     rate = (background @ inside) / np.maximum(n, 1)
     p = _motif_pvalues(n, k / np.maximum(n, 1), rate)
-    lower = np.where(k > 0, beta.ppf(q_threshold, np.maximum(k, 1), n - k + 1), 0.0)
     return pd.DataFrame({"junction_share": 1 - n / presence.sum(axis=0), "internal_n": n,
-                         "internal_fraction_lower": lower, "internal_p_value": np.where(n > 0, p, 1.0)})
+                         "internal_fraction_lower": _depleted_lower(n, k, q_threshold),
+                         "internal_p_value": np.where(n > 0, p, 1.0)})
 
 
 def _junction_dependent(
@@ -409,34 +422,39 @@ def _junction_dependent(
 
 
 def _filter_junction_dependent(
-    df:pd.DataFrame, # candidates, with 'motif' and 'pattern'
+    df:pd.DataFrame, # candidates, with 'motif', 'pattern', 'num_sequences', 'fraction_depleted'
     log2fc_series:pd.Series, # log2FC indexed by insert
     left_context:str, # vector sequence 5' of the insert
     right_context:str, # vector sequence 3' of the insert
     log2fc_thr:float=-1, # a plasmid is depleted below this
-    score_thr:float=0.5, # as for `_junction_dependent`
+    score_thr:float=0.5, # as for `_junction_dependent`, and for `listed`
     min_support:int=5, # as for `_junction_dependent`
-    q_threshold:float=0.05, # as for `_junction_dependent`
+    q_threshold:float=0.05, # as for `_junction_dependent`, and the level of the bound for `listed`
+    p_threshold:float=0.05, # `listed` needs p at or below this: the scan's cutoff
     encoded:tuple|None=None, # the library from `encode_library`, if the caller has it
-    inserts:tuple|None=None, # `encode_library` of the inserts alone, if the caller has it
     background:np.ndarray|None=None, # expected depletion per plasmid; default `plasmid_background`
-)->tuple: # `(kept, dropped)`, rows of `df`; `dropped` adds the columns of `_junction_support`
+    carriers:tuple|None=None, # `_carriers(..., inside=True)` of `df`'s motifs, if the caller has them
+)->tuple: # `(kept, set_aside)`, rows of `df`; `set_aside` adds `_junction_support` and `listed`
     "Set aside the candidates that need the flanks and whose internal carriers miss the bar."
     if df.empty:
         return df, df
-    motifs, pats = df["motif"].tolist(), _patterns(df)
-    if encoded is None:
-        encoded = encode_library(get_lib_seq_context(log2fc_series.index.tolist(),
-                                                     left_context, right_context))
-    if inserts is None:
-        inserts = encode_library(log2fc_series.index.tolist())
     fc = log2fc_series.to_numpy()
     if background is None:
         background = plasmid_background(log2fc_series.index, fc, log2fc_thr)
-    stats = _junction_support(
-        _carriers(encoded, motifs, pats, log2fc_series, left_context, right_context),
-        _carriers(inserts, motifs, pats, log2fc_series, "", ""),
-        fc, background, log2fc_thr, q_threshold).set_index(df.index)
+    if carriers is None:
+        if encoded is None:
+            encoded = encode_library(get_lib_seq_context(log2fc_series.index.tolist(),
+                                                         left_context, right_context))
+        carriers = _carriers(encoded, df["motif"].tolist(), _patterns(df), log2fc_series,
+                             left_context, right_context, inside=True)
+    has, inner = carriers
+    stats = _junction_support(has, inner, fc, background, log2fc_thr, q_threshold).set_index(df.index)
+    # `listed`: it would be called on all its carriers but for this check. Its p-value is one the
+    # scan computed, so its q-value is below q_threshold exactly when p is at or below the cutoff.
+    n, frac = df["num_sequences"].to_numpy(), df["fraction_depleted"].to_numpy()
+    p = _motif_pvalues(n, frac, (background @ has) / has.sum(axis=0))
+    stats["listed"] = (p <= p_threshold) & \
+        (_depleted_lower(n, np.rint(frac * n), q_threshold) >= score_thr)
     out = _junction_dependent(stats, score_thr, min_support, q_threshold).to_numpy()
     return df[~out], df[out].join(stats[out])
 
@@ -452,17 +470,19 @@ def _filter_explained_candidates(
     encoded:tuple|None=None, # the library from `encode_library`, if the caller has it
     p_threshold:float=0.05, # the leftover must beat its carriers' mean background at this p
     background:np.ndarray|None=None, # expected depletion per plasmid; default `plasmid_background`
+    presence:np.ndarray|None=None, # each candidate's carriers (`_carriers`), if the caller has them
 )->tuple: # `(kept, explanations)`: dropped motif -> (explained by, plasmids left, their score)
     "Drop candidates whose depletion is fully accounted for by stronger candidates."
     if len(candidates_df) < 2:
         return candidates_df, {}     # nothing that could explain anything
 
     motifs = candidates_df['motif'].tolist()
-    if encoded is None:
-        encoded = encode_library(
-            get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
-    presence = _carriers(encoded, motifs, _patterns(candidates_df), log2fc_series,
-                         left_context, right_context)
+    if presence is None:
+        if encoded is None:
+            encoded = encode_library(
+                get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
+        presence = _carriers(encoded, motifs, _patterns(candidates_df), log2fc_series,
+                             left_context, right_context)
 
     fc = log2fc_series.to_numpy()
     if background is None:
@@ -600,7 +620,7 @@ def _upper_group_median(values):
 
 def _annotate_significance(results_df, log2fc_series, left_context, right_context,
                           all_pvalues=None, log2fc_thr=-1, q_threshold=0.05, encoded=None,
-                          background=None, score_thr=0.5, min_support=5, inserts=None):
+                          background=None, score_thr=0.5, min_support=5, carriers=None):
     """Add fraction_depleted_lower, background, p_value, q_value, the junction columns, called,
     bimodality and bimodal to a result table.
 
@@ -622,8 +642,8 @@ def _annotate_significance(results_df, log2fc_series, left_context, right_contex
     best, an upper group that is not depleted at `log2fc_thr`.
 
     `junction_share`, `internal_n`, `internal_fraction_lower` and `internal_p_value` are
-    `_junction_support`, with the internal carriers read on `inserts`, the inserts alone encoded
-    (`encode_library(log2fc_series.index)` when not given).
+    `_junction_support`. `carriers` is `_carriers(..., inside=True)` of the rows, read from
+    `encoded` when not given.
 
     Nothing is removed. `called` marks the rows whose q-value is below `q_threshold`, whose
     `fraction_depleted_lower` reaches `score_thr`, and which are not `_junction_dependent` at
@@ -647,23 +667,22 @@ def _annotate_significance(results_df, log2fc_series, left_context, right_contex
         return out
     # Placed beside fraction_depleted below; dropped first so a table can be annotated again.
     out = results_df.drop(columns=["fraction_depleted_lower", "background"], errors="ignore")
-    if encoded is None:
-        encoded = encode_library(
-            get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
     if background is None:
         background = plasmid_background(log2fc_series.index, log2fc_series.to_numpy(), log2fc_thr)
-    if inserts is None:
-        inserts = encode_library(log2fc_series.index.tolist())
-    motifs, pats = out["motif"].tolist(), _patterns(out)
-    presence = _carriers(encoded, motifs, pats, log2fc_series, left_context, right_context)
+    if carriers is None:
+        if encoded is None:
+            encoded = encode_library(
+                get_lib_seq_context(log2fc_series.index.tolist(), left_context, right_context))
+        carriers = _carriers(encoded, out["motif"].tolist(), _patterns(out), log2fc_series,
+                             left_context, right_context, inside=True)
+    presence, inner = carriers
     # Each motif's null is its carriers' mean background, summed exactly as the scan sums it, so
     # that a reported motif's p-value is the scan's to the last bit (see `plasmid_background`).
     rate = (background @ presence) / presence.sum(axis=0)
     n = out["num_sequences"].to_numpy()
     k = np.rint(out["fraction_depleted"].to_numpy() * n)
     at = out.columns.get_loc("fraction_depleted") + 1
-    out.insert(at, "fraction_depleted_lower",
-               np.where(k > 0, beta.ppf(q_threshold, np.maximum(k, 1), n - k + 1), 0.0))
+    out.insert(at, "fraction_depleted_lower", _depleted_lower(n, k, q_threshold))
     out.insert(at + 1, "background", rate)
 
     p = _motif_pvalues(out["num_sequences"].to_numpy(), out["fraction_depleted"].to_numpy(), rate)
@@ -681,8 +700,7 @@ def _annotate_significance(results_df, log2fc_series, left_context, right_contex
     else:
         out["q_value"] = _benjamini_hochberg(p)
     values = log2fc_series.to_numpy()
-    support = _junction_support(presence, _carriers(inserts, motifs, pats, log2fc_series, "", ""),
-                                values, background, log2fc_thr, q_threshold)
+    support = _junction_support(presence, inner, values, background, log2fc_thr, q_threshold)
     for c in support.columns:
         out[c] = support[c].to_numpy()
     out["called"] = (out["q_value"] < q_threshold) & (out["fraction_depleted_lower"] >= score_thr) \
@@ -758,7 +776,7 @@ def _motif_rows(motifs, patterns, log2fc_series, left_context, right_context, en
 
 def _merge_degenerate_calls(table, log2fc_series, left_context, right_context, encoded, background,
                            all_pvalues, log2fc_thr=-1, q_threshold=0.05, score_thr=0.5,
-                           min_support=5, totals=None, inserts=None):
+                           min_support=5, totals=None):
     """Report each degenerate site as one IUPAC motif, in place of its called variants.
 
     Every called row is generalised (`_generalise_motif`); each distinct merged motif that is not an
@@ -774,7 +792,7 @@ def _merge_degenerate_calls(table, log2fc_series, left_context, right_context, e
         encoded (tuple): the library from `encode_library`.
         background (np.ndarray): each plasmid's expected depletion rate.
         all_pvalues (np.ndarray): the p-values of every motif the scan tested.
-        log2fc_thr, q_threshold, score_thr, inserts: as for `_annotate_significance`.
+        log2fc_thr, q_threshold, score_thr: as for `_annotate_significance`.
         min_support (int): as for `_classify_positions` and `_annotate_significance`.
         totals (dict): as for `_classify_positions`.
 
@@ -802,7 +820,7 @@ def _merge_degenerate_calls(table, log2fc_series, left_context, right_context, e
                                    right_context, all_pvalues=all_pvalues, log2fc_thr=log2fc_thr,
                                    q_threshold=q_threshold, encoded=encoded,
                                    background=background, score_thr=score_thr,
-                                   min_support=min_support, inserts=inserts)
+                                   min_support=min_support)
     scored = scored[scored["called"]]
     if scored.empty:
         return table
@@ -978,37 +996,45 @@ def find_restricted_motifs(
                                      score_thr, min_support,
                                      candidates)
 
+    # Each candidate's carriers, and those with a site inside the insert, are read once: the flank
+    # check, step 4 and the report take their columns.
+    carriers = _carriers(encoded_library, candidates["motif"].tolist(), _patterns(candidates),
+                         log2fc_series, left_context_str, right_context_str, inside=True)
+    scanned = candidates.index
+    columns_of = lambda rows: tuple(c[:, scanned.get_indexer(rows.index)] for c in carriers)
+
     # Sites completed by the flank, set aside before step 4 can let them explain other candidates.
-    inserts = encode_library(log2fc_series.index.tolist())
     candidates, flank_only = _filter_junction_dependent(
         candidates, log2fc_series, left_context_str, right_context_str,
         log2fc_thr=log2fc_thr, score_thr=score_thr, min_support=min_support,
-        q_threshold=q_threshold, encoded=encoded_library, inserts=inserts, background=background)
+        q_threshold=q_threshold, p_threshold=scan_cutoff, background=background,
+        carriers=carriers)
     if len(flank_only):
         print(f"{len(flank_only)} candidate(s) that need the vector flanks, without enough "
-              f"internal sites.")
+              f"internal sites ({int(flank_only['listed'].sum())} would otherwise be called).")
         if verbose:
-            for m, s, n, lo in sorted(zip(flank_only["motif"].map(canonical_motif),
-                                          flank_only["junction_share"], flank_only["internal_n"],
-                                          flank_only["internal_fraction_lower"])):
+            for m, s, n, lo, c in sorted(zip(flank_only["motif"].map(canonical_motif),
+                                             flank_only["junction_share"], flank_only["internal_n"],
+                                             flank_only["internal_fraction_lower"],
+                                             flank_only["listed"])):
                 print(f"    {m} ({s:.0%} of carriers need the flank; {n} internal, "
-                      f"lower bound {lo:.2f})")
+                      f"lower bound {lo:.2f}){' -- would otherwise be called' if c else ''}")
 
     # Step 4.
     candidates, explained = _filter_explained_candidates(
         candidates, log2fc_series, left_context_str, right_context_str,
         log2fc_thr=log2fc_thr, score_thr=score_thr,
-        min_support=min_support, encoded=encoded_library,
-        p_threshold=scan_cutoff, background=background)
+        min_support=min_support, p_threshold=scan_cutoff, background=background,
+        presence=columns_of(candidates)[0])
     if explained:
         print(f"{len(explained)} candidate(s) whose score was borrowed from a stronger one.")
         if verbose:
             for m, (by, n, s) in sorted(explained.items()):
                 print(f"    {m} <- {by} (without them: n={n}, score={s:.2f})")
 
-    # The candidates set aside for the flanks are scored too, and reported as not called.
+    # The candidates set aside for the flanks that would otherwise be called: reported, not called.
     if len(flank_only):
-        candidates = pd.concat([candidates, flank_only[candidates.columns]])
+        candidates = pd.concat([candidates, flank_only.loc[flank_only["listed"], candidates.columns]])
     # Canonicalise before printing, so the names in the log are the names in the table.
     candidates = _canonicalise_motifs(candidates)
     print(f"{len(candidates)} motif(s) scored.")
@@ -1018,14 +1044,14 @@ def find_restricted_motifs(
                   f"FracDep: {row['fraction_depleted']:.2f}, "
                   f"AvgFC: {row['avg_log2fc']:.2f}, N: {row['num_sequences']}")
     table = report(candidates, log2fc_series, left_context_str, right_context_str,
-                   all_pvalues=tested_pvalues, encoded=encoded_library, background=background,
-                   inserts=inserts)
+                   all_pvalues=tested_pvalues, background=background,
+                   carriers=columns_of(candidates))
 
     # A degenerate site's called variants, reported as one IUPAC motif.
     table = _merge_degenerate_calls(
         table, log2fc_series, left_context_str, right_context_str, encoded_library, background,
         tested_pvalues, log2fc_thr=log2fc_thr, q_threshold=q_threshold,
-        score_thr=score_thr, min_support=min_support, totals=totals, inserts=inserts)
+        score_thr=score_thr, min_support=min_support, totals=totals)
     merged = table[table["merged_from"] != ""]
     if len(merged):
         print(f"{len(merged)} degenerate site(s) reported as one motif:")

@@ -125,21 +125,26 @@ def test_reference_motifs(cfg, name):
 
 
 def test_reason_of_uncalled_motif():
-    """At the defaults, the 20 nt JJ1886 run scores GTCGNNNNNNNCGGA as significant (q = 1.2e-3)
-    but with only 7 of 12 carriers depleted: the bound on the depleted fraction fails it.
+    """At the defaults, the 20 nt JJ1886 run lists CTTNCACA, significant (q = 7e-5) but with only
+    10 of 20 carriers depleted: the bound on the depleted fraction fails it. It lists CACANNAGTA,
+    which would be called but needs the flank on 188 of its 192 carriers, and whose 4 internal
+    carriers do not stand on their own.
 
-    Since the junction rule (2026-10-19) it also fails that: 8 of its 12 carriers need the flank,
-    and 1 of its 4 internal carriers is depleted. Both reasons are given."""
+    GTCGNNNNNNNCGGA (7 of 12 depleted, bound 0.32) needs the flank too and would fail the bound
+    anyway, so since 2026-10-19 it is not listed: a candidate set aside for the flanks is listed only
+    when it would otherwise be called."""
     path = os.path.join(get_example_data_dir(), JJ1886["file"])
     df = pd.read_csv(path).set_index("seq")
     log2fc = calculate_log2fc(df[["MFDpir", "JJ1886_T0"]], reference_column="MFDpir",
                               count_threshold=20)["JJ1886_T0"]
     full = find_restricted_motifs(log2fc, JJ1886["left"], JJ1886["right"],
                                   all_motifs=True).set_index("motif")
-    assert full.loc["GTCGNNNNNNNCGGA", "reason"] == (
-        "most carriers not shown depleted (7/12; lower bound 0.32 < 0.5); "
-        "junction-dependent: 67% of carriers need the flank, and its internal sites do not reach "
-        "the bar (n = 4, lower bound 0.01, p = 0.23)")
+    assert full.loc["CTTNCACA", "reason"] == \
+        "most carriers not shown depleted (10/20; lower bound 0.30 < 0.5)"
+    assert full.loc["CACANNAGTA", "reason"] == (
+        "junction-dependent: 98% of carriers need the flank, and its internal sites do not reach "
+        "the bar (n = 4, lower bound 0.10, p = 0.02)")
+    assert "GTCGNNNNNNNCGGA" not in full.index
 
 
 def test_call_reason():

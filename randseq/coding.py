@@ -194,7 +194,7 @@ def _motif_totals(seq_idx, motif_codes, fc_values, background, log2FC_thr, n_cod
     return n_seqs, n_depleted, fc_sum, bg_sum, first_seq
 
 # %% ../nbs/04_coding.ipynb #d7fbcd48
-def _motif_presence_matrix(encoded_library, motifs, patterns):
+def _motif_presence_matrix(encoded_library, motifs, patterns, insert=None):
     """Boolean (n_sequences, n_motifs): does sequence i contain motif j, on either strand?
 
     One pass per distinct pattern rather than one per motif, and a lookup into the window codes
@@ -202,11 +202,17 @@ def _motif_presence_matrix(encoded_library, motifs, patterns):
     ambiguity codes, are left as all-False here and not handled; `core` reads a degenerate motif
     through its instances (`_motif_instances`) and an unknown pattern by regex.
 
-    Returns `(matrix, handled)` where `handled` marks the motifs the matrix actually covers.
+    `insert`, for a library of inserts in their flanks, is `(left, right, lengths)`: the length of
+    each flank, and an array of the inserts' lengths. A second matrix then says whether the motif
+    occurs wholly inside the insert, read off the same windows.
+
+    Returns `(matrix, handled)` where `handled` marks the motifs the matrix actually covers, or
+    `(matrix, inside, handled)` with `insert`.
     """
     fwd, rc = encoded_library
     n_seq = fwd.shape[0]
     matrix = np.zeros((n_seq, len(motifs)), dtype=bool)
+    inside = np.zeros_like(matrix)
     handled = np.zeros(len(motifs), dtype=bool)
 
     by_pattern = defaultdict(list)
@@ -236,7 +242,18 @@ def _motif_presence_matrix(encoded_library, motifs, patterns):
         present[rows, hit[rows, where]] = True
         for g, cols in enumerate(groups.values()):
             matrix[:, cols] = present[:, [g]]
+        if insert is not None:
+            # The insert starts `left` bases into a sequence and `right` bases into its reverse
+            # complement; a window is inside it if it starts there and ends by the insert's end.
+            left, right, lengths = insert
+            n_windows = codes.shape[1] // 2
+            start = np.where(where < n_windows, where - left, where - n_windows - right)
+            ok = (start >= 0) & (start + sum(pattern) <= lengths[rows])
+            present[:] = False
+            present[rows[ok], hit[rows[ok], where[ok]]] = True
+            for g, cols in enumerate(groups.values()):
+                inside[:, cols] = present[:, [g]]
         for j, _ in entries:
             handled[j] = True
 
-    return matrix, handled
+    return (matrix, inside, handled) if insert is not None else (matrix, handled)

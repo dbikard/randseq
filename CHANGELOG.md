@@ -77,7 +77,9 @@ motifs = find_restricted_motifs(my_log2fc - my_log2fc.median(), left, right)
   carriers with a site wholly inside the insert (at least `min_support`, lower bound at
   `score_thr`, p < `q_threshold`), or it is not called. The check runs between steps 3 and 4, so
   such a candidate cannot explain others away; it removes flank-completed motifs such as
-  `DCAANNNNNNTAGA` in TA249 and ROAR8 (20 nt example library).
+  `DCAANNNNNNTAGA` in TA249 and ROAR8 (20 nt example library). Such a candidate is listed in the
+  `all_motifs=True` table, not called, only when it would otherwise be called; the log counts the
+  others.
 
 ### New columns
 
@@ -91,8 +93,8 @@ carriers that need the flanks, and the test of the others) are in it too; `call_
 ### Other
 
 - `find_restricted_motifs` prints a short log by default: counts per step, the degenerate
-  merges, the number called. `verbose=True` also lists each candidate step 4 removes and each
-  motif scored.
+  merges, the number called. `verbose=True` also lists each candidate set aside for the flanks,
+  each candidate step 4 removes and each motif scored.
 - IUPAC-aware `revcomp` and `canonical_motif`; `normalise_motif` accepts bracketed classes.
 - `randseq.design`: `plan_library` (which motif architectures a library and vector can detect,
   and the library size a site needs), `min_carriers`, and `carrier_fraction` (now exported and

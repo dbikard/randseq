@@ -30,15 +30,21 @@ def _setup(sample):
     return l2, enc
 
 
-@pytest.mark.parametrize("sample", ["JJ1886_R1", "B156_R1"])
-def test_matrix_matches_regex_exactly(sample):
-    l2, enc = _setup(sample)
+def _top_motifs(l2, enc):
+    """The eight most carried motifs of each pattern."""
     motifs, pats = [], []
     for pat in PATTERNS:
         sc = _get_pattern_scores(enc, l2.tolist(), pat, log2FC_thr=-1)
         top = sc.nlargest(8, "num_sequences")
         motifs += top["motif"].tolist()
         pats += [pat] * len(top)
+    return motifs, pats
+
+
+@pytest.mark.parametrize("sample", ["JJ1886_R1", "B156_R1"])
+def test_matrix_matches_regex_exactly(sample):
+    l2, enc = _setup(sample)
+    motifs, pats = _top_motifs(l2, enc)
 
     matrix, handled = _motif_presence_matrix(enc, motifs, pats)
     assert handled.all(), "every ACGT/N motif should take the fast path"
@@ -48,6 +54,24 @@ def test_matrix_matches_regex_exactly(sample):
             f"{sample} / {m}: vectorized presence disagrees with the regex on "
             f"{int((matrix[:, j] != expected).sum())} sequences"
         )
+
+
+def test_inside_matches_regex_on_inserts():
+    """With `insert`, the second matrix is what the regex finds in the insert alone, read off the
+    flanked windows. The panel's inserts run from 8 to 151 nt, so where the insert ends differs from
+    row to row; the first matrix is unchanged."""
+    l2, enc = _setup("JJ1886_R1")
+    motifs, pats = _top_motifs(l2, enc)
+    lengths = np.array([len(s) for s in l2.index])
+    matrix, inside, handled = _motif_presence_matrix(enc, motifs, pats,
+                                                     (len(LEFT), len(RIGHT), lengths))
+    assert handled.all() and np.array_equal(matrix, _motif_presence_matrix(enc, motifs, pats)[0])
+    assert (matrix & ~inside).any(), "some carriers should need the flanks, or the test is empty"
+    for j, m in enumerate(motifs):
+        expected = _get_filter_for_motif(l2, m, "", "").to_numpy()
+        assert np.array_equal(inside[:, j], expected), (
+            f"{m}: internal presence disagrees with the regex on the inserts on "
+            f"{int((inside[:, j] != expected).sum())} sequences")
 
 
 def test_encode_motif_round_trips():
